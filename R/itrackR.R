@@ -127,6 +127,7 @@ plot.itrackR <- function(obj,zoom=FALSE){
 index_vars <- function(obj,varnames,patterns,numeric.only=FALSE)
 {
   obj <- find_messages(obj,varnames,patterns,numeric.only)
+
   obj$indexvars <- varnames
 
   return(obj)
@@ -158,6 +159,11 @@ find_messages <- function(obj,varnames,patterns,numeric.only = FALSE,timestamp=F
 
   }
 
+
+  matches <- names(obj$header) %in% varnames
+  obj$header <- obj$header[!matches]
+
+
   obj$header <- dplyr::left_join(obj$header,msg_index,by=c('ID','eyetrial'))
 
   if(timestamp)
@@ -168,9 +174,23 @@ find_messages <- function(obj,varnames,patterns,numeric.only = FALSE,timestamp=F
 }
 
 
-add_behdata <- function(obj,beh){
-  behmerged <- merge(beh,obj$header[c('ID','eyetrial',obj$indexvars)],by=c('ID',obj$indexvars),all.x=T)
-  obj$beh <- behmerged
+add_behdata <- function(obj,beh,append=FALSE){
+
+  if(append){
+
+    obj$beh <- merge(obj$beh,beh,by=c('ID',obj$indexvars))
+
+    }
+  else{
+
+    eyedata <- obj$header[c('ID','eyetrial',obj$indexvars)]
+    eyedata <- cbind(eyedata,obj$header[obj$timevars] - obj$header$starttime)
+
+    behmerged <- merge(beh,eyedata,by=c('ID',obj$indexvars),all.x=T)
+    obj$beh <- behmerged
+
+    }
+
   return(obj)
 }
 
@@ -321,7 +341,11 @@ get_all_epochs <- function(obj,epochname,baseline=NULL,baseline.method='percent'
   epochs <- as.data.frame(epochs)
 
   if(shape=='long')
+
     epochs <- tidyr::gather_(epochs,'timepoint','value',timenames)
+    epochs$timepoint <- gsub('t','',epochs$timepoint)
+    epochs$timepoint <- as.numeric(gsub('_','-',epochs$timepoint))
+
 
   if(!is.null(beh))
   {
