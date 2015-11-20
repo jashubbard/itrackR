@@ -257,28 +257,37 @@ get_subdata <- function(obj,id,fields = c('header','samples'))
 load_samples <- function(obj,outdir=tempdir()){
 
   allsamps <- list()
+  samps <- data.table::data.table()
+  alldata <- list()
 
   i <- 1
   for(edf in obj$edfs)
   {
     alldata <- edfR::edf.trials(edf,samples = T,eventmask = T)
 
-    samps <- alldata$samples
-    rm(alldata)
+    samps <- data.table::data.table(alldata$samples)
+
 
     if(all(is.na(samps$paL))){
-      samps <- dplyr::select(samps,-paL,-gxL,gyL)
-      samps <- dplyr::rename(samps,
-                             pa = paR,
-                             gx = gxR,
-                             gy = gyR)
+      samps[,c("paL","gxL","gyL") := NULL] #in-place delete of column
+      data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
+
+#       samps <- dplyr::select(samps,-paL,-gxL,gyL)
+#       samps <- dplyr::rename(samps,
+#                              pa = paR,
+#                              gx = gxR,
+#                              gy = gyR)
       }
     else{
-      samps <- dplyr::select(samps,-paR,-gxR,gyR)
-      samps <- dplyr::rename(samps,
-                           pa = paL,
-                           gx = gxL,
-                           gy = gyL)
+
+      samps[,c("paR","gxR","gyR") :=NULL]
+      data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
+
+#       samps <- dplyr::select(samps,-paR,-gxR,gyR)
+#       samps <- dplyr::rename(samps,
+#                            pa = paL,
+#                            gx = gxL,
+#                            gy = gyL)
     }
 
 
@@ -286,11 +295,12 @@ load_samples <- function(obj,outdir=tempdir()){
     fname <- file.path(outdir,paste0(id,'_samp.rds'))
     saveRDS(samps,fname,compress = T)
     allsamps[[i]] <- fname
-    rm(samps)
+    # rm(samps)
     i <- i+1
   }
 
-
+  rm(alldata)
+  rm(samps)
   obj$samples <- allsamps
   return(obj)
 
@@ -340,12 +350,12 @@ get_all_epochs <- function(obj,epochname,baseline=NULL,baseline.method='percent'
 
   epochs <- as.data.frame(epochs)
 
-  if(shape=='long')
+  if(shape=='long'){
 
     epochs <- tidyr::gather_(epochs,'timepoint','value',timenames)
     epochs$timepoint <- gsub('t','',epochs$timepoint)
     epochs$timepoint <- as.numeric(gsub('_','-',epochs$timepoint))
-
+  }
 
   if(!is.null(beh))
   {
@@ -391,7 +401,7 @@ plot_random_epochs <- function(epochs,n=100)
   }
 
 
-  epochs <- dplyr::select(epochs,matches('^t'))
+  epochs <- dplyr::select(epochs,matches('^t[_0-9]'))
 
   tmp <- dplyr::sample_n(epochs,n)
   matplot(t(as.matrix(tmp)),type='l',lty=1)
