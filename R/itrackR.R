@@ -1,7 +1,7 @@
 
 
 #class constructor
-itrackr <- function(edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768))
+itrackr <- function(edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir())
 {
 
   me <- list(
@@ -215,7 +215,7 @@ epoch_samples <- function(obj,timevar,field='pa',epoch=c(-100,100),cleanup=F)
     trials <- header$eyetrial[!is.na(header[[timevar]])]
     samples <- readRDS(obj$samples[[i]])
 
-    thisepoch <- edfR::epoch.samples(events,samples,sample.field=field,epoch=epoch,eyetrial=T)
+    thisepoch <- edfR::epoch.samples(events,as.data.frame(samples),sample.field=field,epoch=epoch,eyetrial=T)
 
     thisepoch$ID <- rep(id,length(trials))
     thisepoch$event <- timevar
@@ -260,13 +260,18 @@ load_samples <- function(obj,outdir=tempdir()){
   samps <- data.table::data.table()
   alldata <- list()
 
-  i <- 1
-  for(edf in obj$edfs)
+  ncores <- parallel::detectCores()
+  cl <- parallel::makeCluster((ncores/2)-1)
+  doParallel::registerDoParallel(cl)
+
+  # i <- 1
+  allsamps <- foreach::foreach(edf=iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
+  # for(edf in obj$edfs)
   {
-    alldata <- edfR::edf.trials(edf,samples = T,eventmask = T)
+    # alldata <- edfR::edf.trials(edf,samples = T,eventmask = T)
 
-    samps <- data.table::data.table(alldata$samples)
-
+    # samps <- data.table::data.table(alldata$samples)
+      samps <- data.table::as.data.table(edfR::edf.samples(edf,trials=T,eventmask=T))
 
     if(all(is.na(samps$paL))){
       samps[,c("paL","gxL","gyL") := NULL] #in-place delete of column
@@ -294,13 +299,17 @@ load_samples <- function(obj,outdir=tempdir()){
     id <- edf2id(edf)
     fname <- file.path(outdir,paste0(id,'_samp.rds'))
     saveRDS(samps,fname,compress = T)
-    allsamps[[i]] <- fname
+    # allsamps[[i]] <- fname
     # rm(samps)
-    i <- i+1
+    # i <- i+1
+    fname
   }
 
   rm(alldata)
   rm(samps)
+
+  parallel::stopCluster(cl)
+
   obj$samples <- allsamps
   return(obj)
 
