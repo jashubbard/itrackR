@@ -11,5 +11,8 @@ LazyData: TRUE
 Imports:
     doParallel,
     foreach,
+    iterators,
     edfR,
     data.table
+Depends:
+    foreach

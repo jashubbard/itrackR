@@ -265,7 +265,7 @@ load_samples <- function(obj,outdir=tempdir()){
   doParallel::registerDoParallel(cl)
 
   # i <- 1
-  allsamps <- foreach::foreach(edf=iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
+  allsamps <- foreach::foreach(edf=iterators::iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
   # for(edf in obj$edfs)
   {
     # alldata <- edfR::edf.trials(edf,samples = T,eventmask = T)
