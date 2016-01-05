@@ -13,6 +13,11 @@ Imports:
     foreach,
     iterators,
     edfR,
-    data.table
+    data.table,
+    magrittr,
+    ggplot2,
+    dplyr,
+    tidyr
 Depends:
-    foreach
+    foreach,
+    magrittr
