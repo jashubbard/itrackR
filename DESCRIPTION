@@ -13,6 +13,8 @@ Imports:
     foreach,
     iterators,
     edfR,
-    data.table
+    data.table,
+    magrittr
 Depends:
-    foreach
+    foreach,
+    magrittr

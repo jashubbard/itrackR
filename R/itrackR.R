@@ -22,7 +22,7 @@ itrackr <- function(edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),da
   )
 
 
-  class(me) <- append(class(me),'itrackR')
+  class(me) <- append('itrackR',class(me))
 
   if(!is.null(me$edfs))
     {
@@ -40,10 +40,6 @@ itrackr <- function(edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),da
 
 
 load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
-  UseMethod('load_edfs',obj)
-}
-
-load_edfs.itrackR <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 
   fields <- c('fixations','saccades','blinks','messages','header')
 
@@ -54,9 +50,13 @@ load_edfs.itrackR <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 
   obj$header <- alldata$header
   obj$fixations <- alldata$fixations
+  obj$fixations$fixation_key <- 1:nrow(obj$fixations)
   obj$saccades <- alldata$saccades
+  obj$saccades$saccade_key <- 1:nrow(obj$saccades)
   obj$blinks <-alldata$blinks
+  obj$blinks$blink_key <- 1:nrow(obj$blinks)
   obj$messages <- alldata$messages
+  obj$messages$message_key <- 1:nrow(obj$messages)
 
 #   if(samples)
 #     {
@@ -104,23 +104,52 @@ make_fullpath <- function(fname){
 }
 
 
-plot <- function(obj,zoom=FALSE){
-  UseMethod('plot',obj)
+plot <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',names=FALSE){
+  UseMethod('plot')
 
 }
 
-plot.itrackR <- function(obj,zoom=FALSE){
+plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',names=FALSE){
 
-  plt <- ggplot2::ggplot(obj$fixations,ggplot2::aes(x=gavx,y=gavy)) + ggplot2::geom_point() + ggplot2::facet_wrap(~ID)
+
+  if(rois && !is.null(obj$rois)){
+    df <- rois2df(obj)
+
+    if(which !='all')
+      df <- subset(df,name %in% which)
+
+
+    p <- ggplot2::ggplot() + ggplot2::geom_polygon(data=df, ggplot2::aes(x=x,y=y,group=name),fill='gray',alpha=0.5)+
+      ggplot2::geom_point(data=obj$fixations,ggplot2::aes(x=gavx,y=gavy),color='yellow',size=0.7)
+
+    if(names)
+      p <- p + ggplot2::geom_text(data=unique(df[c('xcenter','ycenter','name')]),aes(x=xcenter,y=ycenter,label=name),color='white')
+  }
+  else
+    p <- ggplot2::ggplot(obj$fixations,ggplot2::aes(x=gavx,y=gavy)) + ggplot2::geom_point(color='yellow',size=0.7)
+
 
   if(zoom)
-    plt <- plt+ggplot2::coord_cartesian(xlim=c(0,obj$resolution[1]),ylim=c(0,obj$resolution[2]))
+    p <- p+ggplot2::xlim(xlim=c(0,obj$resolution[1])) + ggplot2::ylim(ylim=c(obj$resolution[2],0))
+  else
+    p <- p + ggplot2::xlim(xlim=c(0,max(obj$fixations$gavx))) + ggplot2::ylim(ylim=c(max(obj$fixations$gavy),0))
 
-  plt <- plt + ggplot2::theme_bw()
+    p <- p + ggplot2::theme(panel.background = element_rect(fill = 'black'),
+                          panel.grid.major = element_blank(),
+                          panel.grid.minor = element_blank())
 
-  plt
+    if(crosshairs){
+      p <- p +
+        ggplot2::geom_hline(yintercept=round(z$resolution[2]/2),color='red',size=0.3,linetype='dashed') +
+        ggplot2::geom_vline(xintercept=round(z$resolution[1]/2),color='red',size=0.3,linetype='dashed')
+    }
 
-  return(plt)
+
+  p <- p + ggplot2::facet_wrap(~ID)
+
+
+  p
+  return(p)
 }
 
 
@@ -430,3 +459,112 @@ edf2id <- function(edf){
 }
 
 
+
+makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,angles=NULL,names=NULL,append=F){
+
+  if(length(shapes)==1 && nrow(coords)>1)
+    shapes <- rep(shapes[1],nrow(coords))
+
+  if(length(radius)==1 && nrow(coords)>1)
+    radius <- rep(radius[1],nrow(coords))
+
+  if(length(xradius)==1 && nrow(coords)>1)
+    xradius <- rep(xradius[1],nrow(coords))
+
+  if(length(yradius)==1 && nrow(coords)>1)
+    yradius <- rep(yradius[1],nrow(coords))
+
+
+
+  if(length(obj$rois)==0 || append==F){
+    start_roi=1
+    obj$rois <- list()
+  }
+  else if(length(obj$rois)>0 && append==T){
+   start_roi = length(obj$rois)+1
+  }
+
+
+  if(is.null(names))
+    names <- start_roi:nrow(coords)
+
+  roipos <- start_roi
+
+
+ for(i in 1:nrow(coords)){
+
+    tmpROI <- list()
+
+    if(shapes[[i]]=='circle')
+      tmpROI$roi <- disc(radius=radius[[i]],centre=coords[i,])
+    else if(shapes[[i]]=='ellipse')
+      tmpROI$roi <- ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])
+
+    tmpROI$name <- names[[i]]
+    tmpROI$shape <- shapes[[i]]
+    tmpROI$center <- coords[i,]
+    tmpROI$radius <- radius[[i]]
+    tmpROI$xradius <- xradius[[i]]
+    tmpROI$yradius <- yradius[[i]]
+
+    obj$rois[[roipos]] <- tmpROI
+    roipos <- roipos + 1
+
+ }
+
+  return(obj)
+
+}
+
+
+plot.rois <- function(obj,which='all',crosshairs=T){
+
+  df <- rois2df(obj)
+
+  if(which !='all')
+    df <- subset(df,name %in% which)
+
+  p <- ggplot2::ggplot() + ggplot2::geom_polygon(data=df, ggplot2::aes(x=x,y=y,group=name),fill='gray',alpha=0.5)+
+    ggplot2::geom_text(data=unique(df[c('xcenter','ycenter','name')]),aes(x=xcenter,y=ycenter,label=name),color='white') +
+    ggplot2::xlim(c(0,obj$resolution[1])) + ggplot2::ylim(c(obj$resolution[2],0)) +
+    ggplot2::theme(panel.background = element_rect(fill = 'black'),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank())
+
+
+  if(crosshairs){
+    p <- p +
+    ggplot2::geom_hline(yintercept=384,color='red',size=0.3,linetype='dashed') +
+    ggplot2::geom_vline(xintercept=512,color='red',size=0.3,linetype='dashed')
+  }
+
+  p
+  return(p)
+
+}
+
+
+ rois2df <- function(obj,which='all'){
+
+  roidfs <- list()
+
+  for(i in 1:length(obj$rois)){
+
+  eltmp <- as.data.frame(vertices(obj$rois[[i]]$roi))
+  eltmp$name <- obj$rois[[i]]$name
+  eltmp$xcenter <- obj$rois[[i]]$center[1]
+  eltmp$ycenter <- obj$rois[[i]]$center[2]
+  eltmp$xradius <- obj$rois[[i]]$xradius
+  eltmp$yradius <- obj$rois[[i]]$yradius
+  eltmp$radius <- obj$rois[[i]]$radius
+  eltmp$shape <- obj$rois[[i]]$shape
+
+  roidfs[[i]]<- eltmp
+
+  }
+
+  df <- do.call('rbind',roidfs)
+  return(df)
+
+
+}
