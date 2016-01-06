@@ -251,8 +251,8 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars,level='group'
   agg <- data.frame()
 
   if(difference && length(rois==2)){
-    aggID_one <- aggregate_fixation_timeseries(z,event='STIMONSET',roi=rois[1],groupvars = c('Task','Conflict'),shape='long',level='ID')
-    aggID_two <- aggregate_fixation_timeseries(z,event='STIMONSET',roi=rois[2],groupvars = c('Task','Conflict'),shape='long',level='ID')
+    aggID_one <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[1],groupvars = c('Task','Conflict'),shape='long',level='ID')
+    aggID_two <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[2],groupvars = c('Task','Conflict'),shape='long',level='ID')
 
     aggID <- merge(aggID_one,aggID_two,by=c('ID','Task','Conflict','bin'))
 
