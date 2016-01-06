@@ -14,7 +14,11 @@ Imports:
     iterators,
     edfR,
     data.table,
-    magrittr
+    magrittr,
+    ggplot2,
+    dplyr,
+    tidyr,
+    spatstat
 Depends:
     foreach,
     magrittr
