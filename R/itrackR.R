@@ -134,9 +134,11 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
   else
     p <- p + ggplot2::xlim(xlim=c(0,max(obj$fixations$gavx))) + ggplot2::ylim(ylim=c(max(obj$fixations$gavy),0))
 
-    p <- p + ggplot2::theme(panel.background = element_rect(fill = 'black'),
-                          panel.grid.major = element_blank(),
-                          panel.grid.minor = element_blank())
+
+    p <- p + ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'black'),
+                          panel.grid.major = ggplot2::element_blank(),
+                          panel.grid.minor = ggplot2::element_blank())
+
 
     if(crosshairs){
       p <- p +
@@ -145,15 +147,15 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
     }
 
 
-  p <- p + ggplot2::facet_wrap(~ID)
 
+  p <- p + ggplot2::facet_wrap(~ID)
 
   p
   return(p)
 }
 
 
-index_vars <- function(obj,varnames,patterns,numeric.only=FALSE)
+set_index <- function(obj,varnames,patterns,numeric.only=FALSE)
 {
   obj <- find_messages(obj,varnames,patterns,numeric.only)
 
@@ -498,7 +500,9 @@ makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,ang
     if(shapes[[i]]=='circle')
       tmpROI$roi <- disc(radius=radius[[i]],centre=coords[i,])
     else if(shapes[[i]]=='ellipse')
-      tmpROI$roi <- ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])
+
+      tmpROI$roi <- spatstat::ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])
+
 
     tmpROI$name <- names[[i]]
     tmpROI$shape <- shapes[[i]]
@@ -525,11 +529,14 @@ plot.rois <- function(obj,which='all',crosshairs=T){
     df <- subset(df,name %in% which)
 
   p <- ggplot2::ggplot() + ggplot2::geom_polygon(data=df, ggplot2::aes(x=x,y=y,group=name),fill='gray',alpha=0.5)+
-    ggplot2::geom_text(data=unique(df[c('xcenter','ycenter','name')]),aes(x=xcenter,y=ycenter,label=name),color='white') +
+
+
+    ggplot2::geom_text(data=unique(df[c('xcenter','ycenter','name')]),ggplot2::aes(x=xcenter,y=ycenter,label=name),color='white') +
     ggplot2::xlim(c(0,obj$resolution[1])) + ggplot2::ylim(c(obj$resolution[2],0)) +
-    ggplot2::theme(panel.background = element_rect(fill = 'black'),
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank())
+    ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'black'),
+            panel.grid.major = ggplot2::element_blank(),
+            panel.grid.minor = ggplot2::element_blank())
+
 
 
   if(crosshairs){
@@ -550,7 +557,8 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 
   for(i in 1:length(obj$rois)){
 
-  eltmp <- as.data.frame(vertices(obj$rois[[i]]$roi))
+  eltmp <- as.data.frame(spatstat::vertices(obj$rois[[i]]$roi))
+
   eltmp$name <- obj$rois[[i]]$name
   eltmp$xcenter <- obj$rois[[i]]$center[1]
   eltmp$ycenter <- obj$rois[[i]]$center[2]

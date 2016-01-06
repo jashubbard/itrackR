@@ -46,7 +46,9 @@ calcHits <- function(obj,rois='all',append=FALSE){
 
   for(i in 1:length(allrois)){
 
-   hits[allnames[[i]]] <- as.numeric(inside.owin(obj$fixations$gavx,obj$fixations$gavy,allrois[[i]]))
+
+   hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$fixations$gavx,obj$fixations$gavy,allrois[[i]]))
+
   }
 
   hits <- hits[,c('fixation_key',paste0('roi_',1:length(obj$rois)))]
@@ -193,7 +195,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   return(obj)
 }
 
-aggregate_fixation_timeseries <- function(obj,event,roi,groupvars,level='group',shape='long'){
+do_agg_fixations <- function(obj,event,roi,groupvars,level='group',shape='long'){
 
   idvar <- 'ID'
   prefix <- 't'
@@ -244,19 +246,79 @@ aggregate_fixation_timeseries <- function(obj,event,roi,groupvars,level='group',
 }
 
 
-plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='group'){
+
+aggregate_fixation_timeseries <- function(obj,event,rois,groupvars,level='group',shape='long',difference=FALSE){
 
   agg <- data.frame()
 
+  if(difference && length(rois==2)){
+    aggID_one <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[1],groupvars = c('Task','Conflict'),shape='long',level='ID')
+    aggID_two <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[2],groupvars = c('Task','Conflict'),shape='long',level='ID')
+
+    aggID <- merge(aggID_one,aggID_two,by=c('ID','Task','Conflict','bin'))
+
+    if( ( (!all(aggID$binwidth.x==aggID$binwidth.y)) || (!all(aggID$epoch_start.x==aggID$epoch_start.y)) || (!all(aggID$epoch_end.x==aggID$epoch_end.y)) ))
+      stop('Epochs/binning is different for the different ROIs. Data will not match up')
+
+    aggID$val <- aggID$val.x - aggID$val.y
+
+    aggID <- dplyr::rename(aggID,
+                           epoch_start = epoch_start.x,
+                           epoch_end = epoch_end.x,
+                           binwidth = binwidth.x)
+
+    aggID <- dplyr::select(aggID,ID,Task,Conflict,bin,val,epoch_start,epoch_end,binwidth)
+
+
+    if(level=='group'){
+      agg <- dplyr::group_by(aggID,bin,Task,Conflict,epoch_start,epoch_end,binwidth) %>%
+        dplyr::summarise(val = mean(val,na.rm=T))
+    }
+    else
+      agg <- aggID
+
+    agg$roi <- 'difference'
+
+  }
+  else{
+
   for(r in rois){
-  aggtmp <- aggregate_fixation_timeseries(obj,event=event,
-                                       roi=r,
+    aggtmp <- do_agg_fixations(obj,event=event,
+                                            roi=r,
+                                            groupvars = groupvars,
+                                            shape=shape,
+                                            level=level)
+
+    agg <- rbind(agg,aggtmp)
+  }
+
+  }
+
+  return(agg)
+}
+
+
+plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='group',difference=FALSE){
+
+#   agg <- data.frame()
+#
+#   for(r in rois){
+#   aggtmp <- aggregate_fixation_timeseries(obj,event=event,
+#                                        roi=r,
+#                                        groupvars = c(lines,rows,cols),
+#                                        shape='long',
+#                                        level=level)
+#
+#   agg <- rbind(agg,aggtmp)
+#   }
+
+  agg <- aggregate_fixation_timeseries(obj,event=event,
+                                       rois=rois,
                                        groupvars = c(lines,rows,cols),
                                        shape='long',
-                                       level=level)
+                                       level=level,
+                                       difference=difference)
 
-  agg <- rbind(agg,aggtmp)
-  }
 
   mainvars <- c('bin','val','roi','epoch_start','epoch_end','binwidth')
   othervars <- names(agg)[-which(names(agg) %in% mainvars)]
@@ -276,10 +338,12 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
     colexp <- do.call('paste',c(as.list(cols),sep=' + '))
   }
 
-  plt <- ggplot2::ggplot(data=tmp,aes(x=bin,y=val,group=lines,color=lines))+
+  plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=lines,color=lines))+
     ggplot2::geom_line(size=.75) +
-    ggplot2::geom_point(size=3) + xlab('time (ms)') + ylab('probability of fixation (%)') +
-    scale_color_discrete(name = toString(lines))
+    ggplot2::geom_point(size=3) + ggplot2::xlab('time (ms)') + ggplot2::ylab('probability of fixation (%)') +
+    ggplot2::scale_color_discrete(name = toString(lines))
+
+
 
   if (!is.null(rows) | !is.null(cols)){
 
@@ -289,17 +353,21 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
       colexp='.'
 
     facetexp <- paste(rowexp,colexp,sep=" ~ ")
-    plt <- plt + facet_grid(facetexp)
+
+    plt <- plt + ggplot2::facet_grid(facetexp)
     }
 
-  plt <- plt +  ggplot2::theme(panel.background = element_rect(fill = 'white'),
-                               panel.border = element_blank(),
-                               axis.line = element_line(),
-                               panel.grid.major = element_blank(),
-                               panel.grid.minor = element_blank())
+  plt <- plt +  ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'white'),
+                               panel.border = ggplot2::element_blank(),
+                               axis.line = ggplot2::element_line(),
+                               panel.grid.major = ggplot2::element_blank(),
+                               panel.grid.minor = ggplot2::element_blank())
+
+
   return(plt)
 
 
 }
+
 
 
