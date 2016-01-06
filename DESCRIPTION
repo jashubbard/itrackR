@@ -18,6 +18,7 @@ Imports:
     ggplot2,
     dplyr,
     tidyr
+
 Depends:
     foreach,
     magrittr
