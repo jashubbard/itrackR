@@ -46,7 +46,7 @@ calcHits <- function(obj,rois='all',append=FALSE){
 
   for(i in 1:length(allrois)){
 
-   hits[allnames[[i]]] <- as.numeric(inside.owin(obj$fixations$gavx,obj$fixations$gavy,allrois[[i]]))
+   hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$fixations$gavx,obj$fixations$gavy,allrois[[i]]))
   }
 
   hits <- hits[,c('fixation_key',paste0('roi_',1:length(obj$rois)))]
@@ -271,7 +271,7 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars,level='group'
 
     if(level=='group'){
       agg <- dplyr::group_by(aggID,bin,Task,Conflict,epoch_start,epoch_end,binwidth) %>%
-        summarise(val = mean(val,na.rm=T))
+        dplyr::summarise(val = mean(val,na.rm=T))
     }
     else
       agg <- aggID

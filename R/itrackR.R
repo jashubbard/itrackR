@@ -499,7 +499,7 @@ makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,ang
     if(shapes[[i]]=='circle')
       tmpROI$roi <- disc(radius=radius[[i]],centre=coords[i,])
     else if(shapes[[i]]=='ellipse')
-      tmpROI$roi <- ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])
+      tmpROI$roi <- spatstat::ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])
 
     tmpROI$name <- names[[i]]
     tmpROI$shape <- shapes[[i]]
@@ -552,7 +552,7 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 
   for(i in 1:length(obj$rois)){
 
-  eltmp <- as.data.frame(vertices(obj$rois[[i]]$roi))
+  eltmp <- as.data.frame(spatstat::vertices(obj$rois[[i]]$roi))
   eltmp$name <- obj$rois[[i]]$name
   eltmp$xcenter <- obj$rois[[i]]$center[1]
   eltmp$ycenter <- obj$rois[[i]]$center[2]

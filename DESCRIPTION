@@ -17,7 +17,8 @@ Imports:
     magrittr,
     ggplot2,
     dplyr,
-    tidyr
+    tidyr,
+    spatstat
 Depends:
     foreach,
     magrittr
