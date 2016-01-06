@@ -138,6 +138,7 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
                           panel.grid.major = ggplot2::element_blank(),
                           panel.grid.minor = ggplot2::element_blank())
 
+
     if(crosshairs){
       p <- p +
         ggplot2::geom_hline(yintercept=round(z$resolution[2]/2),color='red',size=0.3,linetype='dashed') +
@@ -525,6 +526,7 @@ plot.rois <- function(obj,which='all',crosshairs=T){
     df <- subset(df,name %in% which)
 
   p <- ggplot2::ggplot() + ggplot2::geom_polygon(data=df, ggplot2::aes(x=x,y=y,group=name),fill='gray',alpha=0.5)+
+
     ggplot2::geom_text(data=unique(df[c('xcenter','ycenter','name')]),ggplot2::aes(x=xcenter,y=ycenter,label=name),color='white') +
     ggplot2::xlim(c(0,obj$resolution[1])) + ggplot2::ylim(c(obj$resolution[2],0)) +
     ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'black'),

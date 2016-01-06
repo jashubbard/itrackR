@@ -193,6 +193,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   return(obj)
 }
 
+
 do_agg_fixations <- function(obj,event,roi,groupvars,level='group',shape='long'){
 
   idvar <- 'ID'
@@ -242,6 +243,7 @@ do_agg_fixations <- function(obj,event,roi,groupvars,level='group',shape='long')
 
   return(df)
 }
+
 
 
 aggregate_fixation_timeseries <- function(obj,event,rois,groupvars,level='group',shape='long',difference=FALSE){
@@ -316,6 +318,7 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
                                        level=level,
                                        difference=difference)
 
+
   mainvars <- c('bin','val','roi','epoch_start','epoch_end','binwidth')
   othervars <- names(agg)[-which(names(agg) %in% mainvars)]
 
@@ -334,10 +337,12 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
     colexp <- do.call('paste',c(as.list(cols),sep=' + '))
   }
 
+
   plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=lines,color=lines))+
     ggplot2::geom_line(size=.75) +
     ggplot2::geom_point(size=3) + ggplot2::xlab('time (ms)') + ggplot2::ylab('probability of fixation (%)') +
     ggplot2::scale_color_discrete(name = toString(lines))
+
 
   if (!is.null(rows) | !is.null(cols)){
 
@@ -347,6 +352,7 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
       colexp='.'
 
     facetexp <- paste(rowexp,colexp,sep=" ~ ")
+
     plt <- plt + ggplot2::facet_grid(facetexp)
     }
 
@@ -355,6 +361,7 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
                                axis.line = ggplot2::element_line(),
                                panel.grid.major = ggplot2::element_blank(),
                                panel.grid.minor = ggplot2::element_blank())
+
   return(plt)
 
 
