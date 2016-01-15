@@ -16,7 +16,8 @@ itrackr <- function(edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),da
               blinks = data.frame,
               messages = data.frame,
               epochs = list(),
-              beh = data.frame
+              beh = data.frame,
+              transform = list()
   )
 
 
@@ -224,5 +225,65 @@ makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,ang
 
 }
 
+
+eyemerge <- function(obj,eyedata='fixations',behdata='all'){
+
+  eyes <- obj[[eyedata]]
+  beh <- obj$beh
+
+  if(behdata !='all')
+    beh <- dplyr::select_(beh,.dots=c('ID','eyetrial',behdata))
+
+  output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
+  output <- dplyr::arrange(output,ID,eyetrial)
+
+  return(output)
+
+
+
+
+
+}
+
+
+drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
+
+  fixnames <- names(obj$fixations)
+
+  fixdata <- eyemerge(obj,behdata=unique(c('ID','eyetrial',vars)))
+
+  fixdata <- dplyr::group_by_(fixdata,.dots=vars)
+  fixdata <- dplyr::mutate(fixdata,
+                              center_x = median(gavx,na.rm=T),
+                              center_y = median(gavy,na.rm=T))
+  fixdata <- dplyr::ungroup(fixdata)
+
+  fixdata$real_x <- round(obj$resolution[1]/2)
+  fixdata$real_y <- round(obj$resolution[2]/2)
+
+  fixdata <- dplyr::mutate(fixdata,
+                           gavx_raw = gavx,
+                           gavy_raw = gavy,
+                           shift_x = center_x - real_x,
+                           shift_y = center_y - real_y)
+
+
+  fixdata$shift_x[abs(fixdata$shift_x)<threshold] <- 0
+  fixdata$shift_y[abs(fixdata$shift_y)<threshold] <- 0
+  fixdata <- dplyr::mutate(fixdata,
+                          gavx = gavx - shift_x,
+                          gavy = gavy - shift_y)
+
+
+
+ obj$fixations <- fixdata[fixnames]
+
+ obj$transform$fixations <- fixdata[c('ID','eyetrial','fixation_key','shift_x','shift_y')]
+
+
+return(obj)
+
+
+}
 
 
