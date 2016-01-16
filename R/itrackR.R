@@ -1,5 +1,5 @@
 #class constructor
-itrackr <- function(edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir())
+itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir())
 {
 
   me <- list(
@@ -32,6 +32,8 @@ itrackr <- function(edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),da
   if(!is.null(path))
     me <- load_edfs(me,path=path,pattern=pattern)
 
+  if(!is.null(txt))
+    me <- load_txt(me,filename=txt)
 
   return(me)
 
@@ -73,6 +75,51 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 }
 
 
+load_txt <- function(obj,type='fixations',filename,sep='\t'){
+
+
+if(type=='fixations')
+  fnames <- c('RECORDING_SESSION_LABEL','TRIAL_START_TIME','CURRENT_FIX_START','CURRENT_FIX_END','CURRENT_FIX_X','CURRENT_FIX_Y','TRIAL_INDEX')
+if(type=='saccades')
+  fnames <- c('RECORDING_SESSION_LABEL','TRIAL_START_TIME','CURRENT_SAC_START_TIME','CURRENT_SAC_END_TIME','CURRENT_SAC_START_X','CURRENT_SAC_START_Y',
+              'CURRENT_SAC_END_X','CURRENT_SAC_END_Y')
+if(type=='messages')
+  fnames = c()
+
+fixdata <- read.delim(filename,sep=sep)
+
+if(any(!(fnames %in% names(fixdata)))){
+  missing_names <- fnames[!fnames %in% names(fixdata)]
+  error(paste0("The following fields are needed in the input file: ",toString(fnames)))
+}
+
+if(type=='fixations'){
+fixdata <- dplyr::mutate(fixdata,
+                         ID = RECORDING_SESSION_LABEL,
+                         eyetrial = TRIAL_INDEX,
+                         sttime = TRIAL_START_TIME + CURRENT_FIX_START,
+                         entime = TRIAL_START_TIME + CURRENT_FIX_END,
+                         gavx = CURRENT_FIX_X,
+                         gavy = CURRENT_FIX_Y,
+                         fixation_key = 1:nrow(fixdata))
+}
+else if(type=='saccades'){
+
+
+
+
+}
+
+
+
+
+fixdata$ID <- as.numeric(gsub("([0-9]*).*","\\1",fixdata$ID))
+
+obj$fixations <- dplyr::select(fixdata,ID,eyetrial,sttime,entime,gavx,gavy,fixation_key)
+
+return(obj)
+
+}
 
 set_index <- function(obj,varnames,patterns,numeric.only=FALSE)
 {

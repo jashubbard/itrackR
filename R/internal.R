@@ -60,8 +60,6 @@ check_for_samples <- function(obj)
     obj <- load_samples(obj)
   }
 
-
-
   return(obj)
 
 }
