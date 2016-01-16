@@ -282,8 +282,4 @@ drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
 
 
 return(obj)
-
-
 }
-
-
