@@ -47,17 +47,20 @@ load_samples <- function(obj,outdir=tempdir()){
   cl <- parallel::makeCluster((ncores/2)-1)
   doParallel::registerDoParallel(cl)
 
+
+
   # i <- 1
   allsamps <- foreach::foreach(edf=iterators::iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
     # for(edf in obj$edfs)
   {
     # alldata <- edfR::edf.trials(edf,samples = T,eventmask = T)
-
+    # print('Loading samples...')
     # samps <- data.table::data.table(alldata$samples)
     samps <- data.table::as.data.table(edfR::edf.samples(edf,trials=T,eventmask=T))
 
+
     if(all(is.na(samps$paL))){
-      samps[,c("paL","gxL","gyL") := NULL] #in-place delete of column
+      samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
       data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
 
       #       samps <- dplyr::select(samps,-paL,-gxL,gyL)
@@ -65,10 +68,9 @@ load_samples <- function(obj,outdir=tempdir()){
       #                              pa = paR,
       #                              gx = gxR,
       #                              gy = gyR)
-    }
-    else{
+    } else{
 
-      samps[,c("paR","gxR","gyR") :=NULL]
+      samps[,(c("paR","gxR","gyR")) :=NULL]
       data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
 
       #       samps <- dplyr::select(samps,-paR,-gxR,gyR)
@@ -182,3 +184,27 @@ baseline_epochs <- function(epochs,baseline=c(1,100),method='percent'){
 
   return(epoch_b)
 }
+
+
+
+filter.blinks <- function(obj,lower.bound = 100){
+
+  obj <- check_for_samples(obj)
+
+  for(i in 1:length(obj$edfs))
+  {
+
+    samps<- readRDS(obj$samples[[i]])
+
+
+
+    # saveRDS(samps,obj$samples[[i]],compress = T)
+    rm(samps)
+
+  }
+  return(obj)
+
+
+
+}
+
