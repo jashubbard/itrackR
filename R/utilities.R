@@ -297,3 +297,8 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars,level='group'
 }
 
 
+downsample <- function (v, N){ # v is the input vector, and keep every N sample
+  seed <- c(TRUE,rep(FALSE,N-1))
+  cont <- rep(seed,ceiling(length(v)/N))[1:length(v)]
+  return(v[which(cont)])
+}

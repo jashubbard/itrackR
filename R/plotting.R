@@ -167,3 +167,116 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 }
 
 
+plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.start=NULL,time.end=NULL){
+
+
+  #load sample data if you haven't already
+  obj <- check_for_samples(obj)
+
+  #find the appropriate file that matches the ID you want
+  sampfile <- unlist(z$samples[grepl(ID,z$samples)])
+
+  #load in sample data
+  samps <- readRDS(sampfile)
+  samps <- as.data.frame(samps)
+
+  timestart <- samps$time[1]
+
+  if(!is.null(time.start))
+    range_start <- timestart+time.start
+  else
+    range_start <- timestart
+
+
+  if(!is.null(time.end))
+    range_end <- timestart+time.end
+  else
+    range_end <- range_end <- max(samps$time)
+
+
+  samps <- subset(samps,time>=range_start & time<=range_end)
+
+  #for now, bin our sample data into 10 equal bins
+  samps$bin <- findInterval(1:nrow(samps),seq(1,nrow(samps),nrow(samps)/10))
+
+
+  plt <- ggplot2::ggplot()
+
+  #downsample to every 100 samples
+  downsamps <- samps[downsample(1:nrow(samps),100),]
+
+  #limits for the y axes (5th precentile - 300 to maximum value +100)
+  ylow <- quantile(samps$pa,.05, na.rm=T)-300
+  yhigh <- max(samps$pa,na.rm=T)+100
+  barheight <- (yhigh - ylow)/8
+
+
+  if(showmean){
+    #get the mean of all pupil data
+    meanpupil <- mean(samps$pa,na.rm=T)
+    #plot a horizontal dotted line
+    plt <- plt + ggplot2::geom_hline(yintercept=meanpupil,alpha=0.5, linetype='longdash',size=0.5)
+  }
+
+  #draw little rectangles when certain events occur
+  if(events){
+
+    fixations <- obj$fixations[obj$fixations$ID==ID,]
+    fixations$time <- fixations$sttime
+
+    fixations <- subset(fixations,time>=range_start & time<=range_end)
+
+    fixations <- dplyr::left_join(fixations,samps[c('time','bin')],by='time')
+    fixations$ymin <- ylow
+    fixations$ymax <- ylow+barheight
+
+
+
+    blinks <- obj$blinks[obj$blinks$ID==ID,]
+    blinks$time <- blinks$sttime
+
+    blinks <- subset(blinks,time>=range_start & time<=range_end)
+
+    blinks <- dplyr::left_join(blinks,samps[c('time','bin')],by='time')
+    blinks$ymin <- ylow+barheight+10
+    blinks$ymax <- blinks$ymin+barheight
+
+    #do the actual plotting
+    plt <- plt +
+      ggplot2::geom_rect(ggplot2::aes(xmin = sttime, xmax = entime,ymin=ymin,ymax=ymax),fill='red',alpha=0.6,data=blinks) +
+      ggplot2::geom_rect(ggplot2::aes(xmin = sttime, xmax = entime,ymin=ymin,ymax=ymax),fill='green',alpha=0.6,data=fixations)
+
+  }
+
+  #draw dotted lines that correspond to some timestamp
+  if(!is.null(timestamp)){
+    msgtime <- obj$messages[obj$messages$ID==ID & grepl(pattern = timestamp ,obj$messages$message),]
+    msgtime$flag <- 1
+    msgtime$time <- msgtime$sttime
+
+    msgtime <- subset(msgtime,time>=range_start & time<=range_end)
+
+    msgtime <- left_join(msgtime,samps[c('time','bin')],by='time')
+    plt <- plt + ggplot2::geom_vline(ggplot2::aes(xintercept=sttime),size=0.3,color='blue',linetype = "longdash",alpha=0.3,data=msgtime)
+  }
+
+
+  #draw the pupil data
+    plt <- plt +
+      ggplot2::geom_line(data=downsamps, ggplot2::aes(x=time,y=pa),size=1.0)  +
+      ggplot2::theme_bw() +
+      ggplot2::ylim(c(ylow,yhigh)) +
+      ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'white'),
+                              panel.grid.major = ggplot2::element_blank(),
+                              panel.grid.minor = ggplot2::element_blank())
+
+
+    if(bin)
+      plt <- plt + ggplot2::facet_wrap(~bin,ncol=1,scales = 'free_x')
+
+    plt
+
+    return(plt)
+
+}
+

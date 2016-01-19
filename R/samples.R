@@ -196,8 +196,6 @@ filter.blinks <- function(obj,lower.bound = 100){
 
     samps<- readRDS(obj$samples[[i]])
 
-
-
     # saveRDS(samps,obj$samples[[i]],compress = T)
     rm(samps)
 
