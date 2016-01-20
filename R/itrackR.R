@@ -11,6 +11,7 @@ itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1
               resolution = resolution,
               header = data.frame,
               samples = list(),
+              sample.dir = NULL,
               fixations = data.frame,
               saccades = data.frame,
               blinks = data.frame,

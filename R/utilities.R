@@ -302,3 +302,66 @@ downsample <- function (v, N){ # v is the input vector, and keep every N sample
   cont <- rep(seed,ceiling(length(v)/N))[1:length(v)]
   return(v[which(cont)])
 }
+
+change.sampledir <- function(obj,dir){
+
+  olddir <- obj$sample.dir
+
+  for(s in obj$samples){
+
+    if(!file.exists(s))
+      stop('Some files are missing. Run load.samples to save all sample data first.')
+
+    fname <- basename(s)
+    newname <- file.path(dir,fname)
+    file.copy(s,newname)
+    file.remove(s)
+  }
+
+  return(obj)
+
+}
+
+
+
+# Implementation of the Engbert & Kliegl algorithm for the
+# detection of saccades.  This function takes a data frame of the
+# samples and adds three columns:
+#
+# - A column named "saccade" which contains booleans indicating
+#   whether the sample occurred during a saccade or not.
+# - Columns named vx and vy which indicate the horizontal and vertical
+#   speed.
+#code borrowed from the "saccades" package
+detect.saccades <- function(samples, lambda=15, smooth.saccades=T) {
+
+  # Calculate horizontal and vertical velocities:
+  vx <- stats::filter(samples$x, -1:1/2)
+  vy <- stats::filter(samples$y, -1:1/2)
+
+  # We don't want NAs, as they make our life difficult later
+  # on.  Therefore, fill in missing values:
+  vx[1] <- vx[2]
+  vy[1] <- vy[2]
+  vx[length(vx)] <- vx[length(vx)-1]
+  vy[length(vy)] <- vy[length(vy)-1]
+
+  msdx <- sqrt(median(vx**2, na.rm=T) - median(vx, na.rm=T)**2)
+  msdy <- sqrt(median(vy**2, na.rm=T) - median(vy, na.rm=T)**2)
+
+  radiusx <- msdx * lambda
+  radiusy <- msdy * lambda
+
+  sacc <- ((vx/radiusx)**2 + (vy/radiusy)**2) > 1
+  if (smooth.saccades) {
+    sacc <- stats::filter(sacc, rep(1/3, 3))
+    sacc <- as.logical(round(sacc))
+  }
+  samples$saccade <- ifelse(is.na(sacc), F, sacc)
+  samples$vx <- vx
+  samples$vy <- vy
+
+  samples
+
+}
+

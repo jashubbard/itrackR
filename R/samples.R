@@ -37,7 +37,9 @@ epoch_samples <- function(obj,timevar,field='pa',epoch=c(-100,100),cleanup=F)
 
 }
 
-load_samples <- function(obj,outdir=tempdir()){
+load_samples <- function(obj,outdir=NULL, force=F){
+
+
 
   allsamps <- list()
   samps <- data.table::data.table()
@@ -48,6 +50,12 @@ load_samples <- function(obj,outdir=tempdir()){
   doParallel::registerDoParallel(cl)
 
 
+  if(!is.null(outdir))
+    obj$sample.dir <- outdir
+  else if(is.null(outdir) && is.null(obj$sample.dir))
+    obj$sample.dir <- tempdir()
+
+
 
   # i <- 1
   allsamps <- foreach::foreach(edf=iterators::iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
@@ -56,7 +64,15 @@ load_samples <- function(obj,outdir=tempdir()){
     # alldata <- edfR::edf.trials(edf,samples = T,eventmask = T)
     # print('Loading samples...')
     # samps <- data.table::data.table(alldata$samples)
-    samps <- data.table::as.data.table(edfR::edf.samples(edf,trials=T,eventmask=T))
+
+    id <- edf2id(edf)
+    fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
+
+    if(file.exists(fname) && !force)
+      samps <- readRDS(fname)
+    else{
+      samps <- data.table::as.data.table(edfR::edf.samples(edf,trials=T,eventmask=T))
+
 
 
     if(all(is.na(samps$paL))){
@@ -81,9 +97,10 @@ load_samples <- function(obj,outdir=tempdir()){
     }
 
 
-    id <- edf2id(edf)
-    fname <- file.path(outdir,paste0(id,'_samp.rds'))
+
+
     saveRDS(samps,fname,compress = T)
+    }
     # allsamps[[i]] <- fname
     # rm(samps)
     # i <- i+1
