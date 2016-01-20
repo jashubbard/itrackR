@@ -148,7 +148,8 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 
 
     ggplot2::geom_text(data=unique(df[c('xcenter','ycenter','name')]),ggplot2::aes(x=xcenter,y=ycenter,label=name),color='white') +
-    ggplot2::xlim(c(0,obj$resolution[1])) + ggplot2::ylim(c(obj$resolution[2],0)) +
+    ggplot2::coord_cartesian(xlim=c(0,obj$resolution[1]), ylim = c(obj$resolution[2],0)) +
+    ggplot2::scale_y_reverse() +
     ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'black'),
                    panel.grid.major = ggplot2::element_blank(),
                    panel.grid.minor = ggplot2::element_blank())
@@ -168,7 +169,6 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 
 
 plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.start=NULL,time.end=NULL){
-
 
   #load sample data if you haven't already
   obj <- check_for_samples(obj)
