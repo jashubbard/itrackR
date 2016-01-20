@@ -24,12 +24,13 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
 
 
   if(zoom)
-    p <- p+ggplot2::xlim(xlim=c(0,obj$resolution[1])) + ggplot2::ylim(ylim=c(obj$resolution[2],0))
+    p <- p+ggplot2::coord_cartesian(xlim=c(0,obj$resolution[1]), ylim=c(obj$resolution[2],0))
   else
-    p <- p + ggplot2::xlim(xlim=c(0,max(obj$fixations$gavx))) + ggplot2::ylim(ylim=c(max(obj$fixations$gavy),0))
+    p <- p + ggplot2::coord_cartesian(xlim=c(0,max(obj$fixations$gavx)), ylim=c(max(obj$fixations$gavy),0))
 
 
-  p <- p + ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'black'),
+  p <- p + ggplot2::scale_y_reverse() +
+    ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'black'),
                           panel.grid.major = ggplot2::element_blank(),
                           panel.grid.minor = ggplot2::element_blank())
 
@@ -148,7 +149,8 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 
 
     ggplot2::geom_text(data=unique(df[c('xcenter','ycenter','name')]),ggplot2::aes(x=xcenter,y=ycenter,label=name),color='white') +
-    ggplot2::xlim(c(0,obj$resolution[1])) + ggplot2::ylim(c(obj$resolution[2],0)) +
+    ggplot2::coord_cartesian(xlim=c(0,obj$resolution[1]), ylim = c(obj$resolution[2],0)) +
+    ggplot2::scale_y_reverse() +
     ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'black'),
                    panel.grid.major = ggplot2::element_blank(),
                    panel.grid.minor = ggplot2::element_blank())
@@ -168,7 +170,6 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 
 
 plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.start=NULL,time.end=NULL){
-
 
   #load sample data if you haven't already
   obj <- check_for_samples(obj)
