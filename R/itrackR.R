@@ -11,6 +11,7 @@ itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1
               resolution = resolution,
               header = data.frame,
               samples = list(),
+              sample.dir = NULL,
               fixations = data.frame,
               saccades = data.frame,
               blinks = data.frame,
@@ -250,7 +251,7 @@ makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,ang
     tmpROI <- list()
 
     if(shapes[[i]]=='circle')
-      tmpROI$roi <- disc(radius=radius[[i]],centre=coords[i,])
+      tmpROI$roi <- spatstat::disc(radius=radius[[i]],centre=coords[i,])
     else if(shapes[[i]]=='ellipse')
 
       tmpROI$roi <- spatstat::ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])

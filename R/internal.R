@@ -54,13 +54,18 @@ make_fullpath <- function(fname){
 check_for_samples <- function(obj)
 {
 
-  if(length(obj$samples)<length(obj$edfs))
-  {
-    print('Sample data not loaded yet. Loading now (this make take a while)...')
+  #quickly check if all sample files exist. If so, just stop
+  if(all(unlist(lapply(obj$samples,file.exists))) && length(obj$samples)==length(obj$edfs))
+    return(obj)
+  else{
+
+    print('At least some sample data not loaded yet. Loading now (this make take a while)...')
     obj <- load_samples(obj)
+
+    return(obj)
+
   }
 
-  return(obj)
-
 }
+
 

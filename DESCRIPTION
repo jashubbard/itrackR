@@ -21,4 +21,5 @@ Imports:
     spatstat
 Depends:
     foreach,
-    magrittr
+    magrittr,
+    data.table

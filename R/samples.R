@@ -37,7 +37,9 @@ epoch_samples <- function(obj,timevar,field='pa',epoch=c(-100,100),cleanup=F)
 
 }
 
-load_samples <- function(obj,outdir=tempdir()){
+load_samples <- function(obj,outdir=NULL, force=F){
+
+
 
   allsamps <- list()
   samps <- data.table::data.table()
@@ -47,17 +49,34 @@ load_samples <- function(obj,outdir=tempdir()){
   cl <- parallel::makeCluster((ncores/2)-1)
   doParallel::registerDoParallel(cl)
 
+
+  if(!is.null(outdir))
+    obj$sample.dir <- outdir
+  else if(is.null(outdir) && is.null(obj$sample.dir))
+    obj$sample.dir <- tempdir()
+
+
+
   # i <- 1
   allsamps <- foreach::foreach(edf=iterators::iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
     # for(edf in obj$edfs)
   {
     # alldata <- edfR::edf.trials(edf,samples = T,eventmask = T)
-
+    # print('Loading samples...')
     # samps <- data.table::data.table(alldata$samples)
-    samps <- data.table::as.data.table(edfR::edf.samples(edf,trials=T,eventmask=T))
+
+    id <- edf2id(edf)
+    fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
+
+    if(file.exists(fname) && !force)
+      samps <- readRDS(fname)
+    else{
+      samps <- data.table::as.data.table(edfR::edf.samples(edf,trials=T,eventmask=T))
+
+
 
     if(all(is.na(samps$paL))){
-      samps[,c("paL","gxL","gyL") := NULL] #in-place delete of column
+      samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
       data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
 
       #       samps <- dplyr::select(samps,-paL,-gxL,gyL)
@@ -65,10 +84,9 @@ load_samples <- function(obj,outdir=tempdir()){
       #                              pa = paR,
       #                              gx = gxR,
       #                              gy = gyR)
-    }
-    else{
+    } else{
 
-      samps[,c("paR","gxR","gyR") :=NULL]
+      samps[,(c("paR","gxR","gyR")) :=NULL]
       data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
 
       #       samps <- dplyr::select(samps,-paR,-gxR,gyR)
@@ -79,9 +97,10 @@ load_samples <- function(obj,outdir=tempdir()){
     }
 
 
-    id <- edf2id(edf)
-    fname <- file.path(outdir,paste0(id,'_samp.rds'))
+
+
     saveRDS(samps,fname,compress = T)
+    }
     # allsamps[[i]] <- fname
     # rm(samps)
     # i <- i+1
@@ -182,3 +201,25 @@ baseline_epochs <- function(epochs,baseline=c(1,100),method='percent'){
 
   return(epoch_b)
 }
+
+
+
+filter.blinks <- function(obj,lower.bound = 100){
+
+  obj <- check_for_samples(obj)
+
+  for(i in 1:length(obj$edfs))
+  {
+
+    samps<- readRDS(obj$samples[[i]])
+
+    # saveRDS(samps,obj$samples[[i]],compress = T)
+    rm(samps)
+
+  }
+  return(obj)
+
+
+
+}
+
