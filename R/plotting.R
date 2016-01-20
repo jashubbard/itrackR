@@ -180,6 +180,7 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
   #load in sample data
   samps <- readRDS(sampfile)
   samps <- as.data.frame(samps)
+  samps$index <- 1:nrow(samps)
 
   timestart <- samps$time[1]
 
@@ -225,27 +226,34 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
     fixations <- obj$fixations[obj$fixations$ID==ID,]
     fixations$time <- fixations$sttime
 
+
     fixations <- subset(fixations,time>=range_start & time<=range_end)
 
-    fixations <- dplyr::left_join(fixations,samps[c('time','bin')],by='time')
+    fixations <- dplyr::left_join(fixations,samps[c('time','index','bin')],by='time')
     fixations$ymin <- ylow
     fixations$ymax <- ylow+barheight
+
+    fixations$xmin <- fixations$index
+    fixations$xmax <- fixations$index + (fixations$entime - fixations$sttime)
 
 
 
     blinks <- obj$blinks[obj$blinks$ID==ID,]
     blinks$time <- blinks$sttime
 
+
     blinks <- subset(blinks,time>=range_start & time<=range_end)
 
-    blinks <- dplyr::left_join(blinks,samps[c('time','bin')],by='time')
+    blinks <- dplyr::left_join(blinks,samps[c('time','index','bin')],by='time')
     blinks$ymin <- ylow+barheight+10
     blinks$ymax <- blinks$ymin+barheight
+    blinks$xmin <- blinks$index
+    blinks$xmax <- blinks$index + (blinks$entime - blinks$sttime)
 
     #do the actual plotting
     plt <- plt +
-      ggplot2::geom_rect(ggplot2::aes(xmin = sttime, xmax = entime,ymin=ymin,ymax=ymax),fill='red',alpha=0.6,data=blinks) +
-      ggplot2::geom_rect(ggplot2::aes(xmin = sttime, xmax = entime,ymin=ymin,ymax=ymax),fill='green',alpha=0.6,data=fixations)
+      ggplot2::geom_rect(ggplot2::aes(xmin = xmin, xmax = xmax,ymin=ymin,ymax=ymax),fill='red',alpha=0.6,data=blinks) +
+      ggplot2::geom_rect(ggplot2::aes(xmin = xmin, xmax = xmax,ymin=ymin,ymax=ymax),fill='green',alpha=0.6,data=fixations)
 
   }
 
@@ -253,18 +261,19 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
   if(!is.null(timestamp)){
     msgtime <- obj$messages[obj$messages$ID==ID & grepl(pattern = timestamp ,obj$messages$message),]
     msgtime$flag <- 1
-    msgtime$time <- msgtime$sttime
+    msgtime$time <- msgtime$sttime - timestart
 
     msgtime <- subset(msgtime,time>=range_start & time<=range_end)
 
-    msgtime <- left_join(msgtime,samps[c('time','bin')],by='time')
-    plt <- plt + ggplot2::geom_vline(ggplot2::aes(xintercept=sttime),size=0.3,color='blue',linetype = "longdash",alpha=0.3,data=msgtime)
+    msgtime <- left_join(msgtime,samps[c('time','index','bin')],by='time')
+    plt <- plt + ggplot2::geom_vline(ggplot2::aes(xintercept=index),size=0.3,color='blue',linetype = "longdash",alpha=0.3,data=msgtime)
   }
+
 
 
   #draw the pupil data
     plt <- plt +
-      ggplot2::geom_line(data=downsamps, ggplot2::aes(x=time,y=pa),size=1.0)  +
+      ggplot2::geom_line(data=downsamps, ggplot2::aes(x=index,y=pa),size=1.0)  +
       ggplot2::theme_bw() +
       ggplot2::ylim(c(ylow,yhigh)) +
       ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'white'),
