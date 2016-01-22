@@ -52,18 +52,6 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
 
 plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='group',difference=FALSE){
 
-  #   agg <- data.frame()
-  #
-  #   for(r in rois){
-  #   aggtmp <- aggregate_fixation_timeseries(obj,event=event,
-  #                                        roi=r,
-  #                                        groupvars = c(lines,rows,cols),
-  #                                        shape='long',
-  #                                        level=level)
-  #
-  #   agg <- rbind(agg,aggtmp)
-  #   }
-
   agg <- aggregate_fixation_timeseries(obj,event=event,
                                        rois=rois,
                                        groupvars = c(lines,rows,cols),
@@ -109,11 +97,15 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
     plt <- plt + ggplot2::facet_grid(facetexp)
   }
 
-  plt <- plt +  ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'white'),
+  plt <- plt + ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'white'),
                                panel.border = ggplot2::element_blank(),
                                axis.line = ggplot2::element_line(),
                                panel.grid.major = ggplot2::element_blank(),
                                panel.grid.minor = ggplot2::element_blank())
+
+
+
+    plt
 
   return(plt)
 
@@ -132,8 +124,17 @@ plot_random_epochs <- function(epochs,n=100)
 
   epochs <- dplyr::select(epochs,matches('^t[_0-9]'))
 
-  tmp <- dplyr::sample_n(epochs,n)
-  matplot(t(as.matrix(tmp)),type='l',lty=1)
+  firstpoint <- gsub(colnames(epochs)[1],'t','')
+  firstpoint <- as.numeric(gsub(firstpoint,'_','-'))
+
+  lastpoint <- gsub(colnames(epochs)[ncol(epochs)],'t','')
+  lastpoint <- as.numeric(gsub(lastpoint,'_','-'))
+
+  matplot(t(as.matrix(tmp)),type='l',lty=1,axes=FALSE)
+
+  axis(2)
+  axis(1,at=seq(firstpoint,lastpoint,100),labels=seq(firstpoint,lastpoint,100)-(firstpoint))
+  abline(v=firstpoint,col=4,lty=2,lwd=2)
 
 }
 
@@ -260,15 +261,24 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
   #draw dotted lines that correspond to some timestamp
   if(!is.null(timestamp)){
     msgtime <- obj$messages[obj$messages$ID==ID & grepl(pattern = timestamp ,obj$messages$message),]
+
+    if(nrow(msgtime)>0){
     msgtime$flag <- 1
     msgtime$time <- msgtime$sttime - timestart
 
     msgtime <- subset(msgtime,time>=range_start & time<=range_end)
 
-    msgtime <- left_join(msgtime,samps[c('time','index','bin')],by='time')
-    plt <- plt + ggplot2::geom_vline(ggplot2::aes(xintercept=index),size=0.3,color='blue',linetype = "longdash",alpha=0.3,data=msgtime)
+    msgtime <- dplyr::left_join(msgtime,samps[c('time','index','bin')],by='time')
+    msgtime <- subset(msgtime, !is.na(bin))
+    plt <- plt + ggplot2::geom_vline(ggplot2::aes(xintercept=index),size=0.3,color='blue',linetype = "longdash",alpha=0.6,data=msgtime)
+    }
+    else
+      warning('timestamp message not found')
   }
 
+
+  xbreaks <- seq(1,downsamps$index[nrow(downsamps)],10000)
+  xlabels <- floor((downsamps$time[xbreaks]-timestart)/1000)
 
 
   #draw the pupil data
@@ -282,7 +292,7 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
 
 
     if(bin)
-      plt <- plt + ggplot2::facet_wrap(~bin,ncol=1,scales = 'free_x')
+      plt <- plt + ggplot2::facet_wrap(~bin,ncol=1,scales = 'free_x') + ggplot2::ylab('pupil size (arbitrary units)') + ggplot2::scale_x_continuous(name='time (seconds)',breaks=xbreaks,labels=xlabels)
 
     plt
 

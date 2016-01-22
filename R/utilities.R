@@ -179,7 +179,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df$binwidth <- binwidth
   df <- df[,c('ID','eyetrial','fixation_key','roi','epoch_start','epoch_end','binwidth',startvar,endvar,hitvar,vars)]
 
-  df <- merge(obj$beh,df,by=c('ID','eyetrial'),all.y=T)
+  df <- merge(obj$beh[c('ID','eyetrial',obj$indexvars)],df,by=c('ID','eyetrial'),all.y=T)
   df <- dplyr::arrange(df,fixation_key)
 
 
@@ -196,12 +196,14 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
 }
 
 
-do_agg_fixations <- function(obj,event,roi,groupvars,level='group',shape='long'){
+do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='long'){
   idvar <- 'ID'
   prefix <- 't'
 
   #reshape the data (turn our bins into rows)
-  df <- obj$epochs$fixations[[event]][[roi]]
+  # df <- obj$epochs$fixations[[event]][[roi]]
+
+  df <- eyemerge(obj,'epoched_fixations',behdata=groupvars,event=event,roi=roi)
 
   epoch_start <- df$epoch_start[1]
   epoch_end <- df$epoch_end[1]
@@ -217,8 +219,8 @@ do_agg_fixations <- function(obj,event,roi,groupvars,level='group',shape='long')
   df <- dplyr::group_by_(df,.dots=varnames) %>%
     dplyr::summarise(val = max(val,na.rm=T))
 
-  if(level!='trial' || level=='subject' || level=='ID'){
-    #aggregate by subject (mean or median)
+  if(level!='trial'){
+    #aggregate by subject (mean)
     varnames2 = sapply(c(idvar,groupvars,'bin'), . %>% {as.formula(paste0('~', .))})
 
     df <- dplyr::group_by_(dplyr::ungroup(df),.dots=varnames2) %>%
@@ -246,7 +248,7 @@ do_agg_fixations <- function(obj,event,roi,groupvars,level='group',shape='long')
 }
 
 
-aggregate_fixation_timeseries <- function(obj,event,rois,groupvars,level='group',shape='long',difference=FALSE){
+aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',difference=FALSE){
 
   agg <- data.frame()
 

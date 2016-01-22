@@ -1,4 +1,4 @@
-epoch_samples <- function(obj,timevar,field='pa',epoch=c(-100,100),cleanup=F)
+epoch_samples <- function(obj,timevar,field='pa',epoch=c(-100,100))
 {
 
   obj <- check_for_samples(obj) #if we haven't loaded sample data yet, this will do it
@@ -23,7 +23,7 @@ epoch_samples <- function(obj,timevar,field='pa',epoch=c(-100,100),cleanup=F)
     thisepoch$ID <- rep(id,length(trials))
     thisepoch$event <- timevar
     thisepoch$eyetrial <- trials
-    obj$epochs[[timevar]][[i]] <- thisepoch
+    obj$epochs$samples[[timevar]][[i]] <- thisepoch
 
     rm(samples)
     gc()
@@ -139,13 +139,13 @@ remove_blinks <- function(obj)
   return(obj)
 }
 
-get_all_epochs <- function(obj,epochname,baseline=NULL,baseline.method='percent',shape='wide',beh=NULL)
+get_all_epochs <- function(obj,epochname,baseline=NULL,baseline.method='percent',shape='wide',beh='all')
 {
 
-  window_start <- obj$epochs[[epochname]][[1]]$epoch.window[1]
-  window_end <- obj$epochs[[epochname]][[1]]$epoch.window[2]
+  window_start <- obj$epochs$samples[[epochname]][[1]]$epoch.window[1]
+  window_end <- obj$epochs$samples[[epochname]][[1]]$epoch.window[2]
 
-  epochs <- obj$epochs[[epochname]]
+  epochs <- obj$epochs$samples[[epochname]]
   epochs <- lapply(epochs,function(x) cbind(x$ID,x$eyetrial,x$epochs))
   epochs <- do.call(rbind,epochs)
 
@@ -171,12 +171,12 @@ get_all_epochs <- function(obj,epochname,baseline=NULL,baseline.method='percent'
   if(!is.null(beh))
   {
 
-    if(is.logical(beh) && beh==TRUE)
+    if(beh[1]=='all' || (is.logical(beh) && beh==TRUE))
       behnames <- names(obj$beh)
     else
       behnames <- unique(c('ID','eyetrial',beh))
 
-    epochs <- dplyr::left_join(epochs,dplyr::select_(obj$beh,.dots=behnames),by=c('ID','eyetrial'))
+    epochs <- dplyr::right_join(dplyr::select_(obj$beh,.dots=behnames),epochs,by=c('ID','eyetrial'))
 
     if(shape=='long')
       epochs <- dplyr::arrange(epochs,ID,eyetrial,timepoint)
@@ -184,8 +184,6 @@ get_all_epochs <- function(obj,epochname,baseline=NULL,baseline.method='percent'
       epochs <- dplyr::arrange(epochs,ID,eyetrial)
 
   }
-
-
 
   return(epochs)
 }
@@ -204,22 +202,4 @@ baseline_epochs <- function(epochs,baseline=c(1,100),method='percent'){
 
 
 
-filter.blinks <- function(obj,lower.bound = 100){
-
-  obj <- check_for_samples(obj)
-
-  for(i in 1:length(obj$edfs))
-  {
-
-    samps<- readRDS(obj$samples[[i]])
-
-    # saveRDS(samps,obj$samples[[i]],compress = T)
-    rm(samps)
-
-  }
-  return(obj)
-
-
-
-}
 
