@@ -277,8 +277,8 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
   }
 
 
-  xbreaks <- seq(1,downsamps$index[nrow(downsamps)],10000)
-  xlabels <- floor((downsamps$time[xbreaks]-timestart)/1000)
+  xbreaks <- downsamps$index[seq(1,nrow(downsamps),100)]
+  xlabels <- floor((downsamps$time[seq(1,nrow(downsamps),100)]-timestart)/1000)
 
 
   #draw the pupil data

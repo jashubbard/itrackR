@@ -117,7 +117,40 @@ load_samples <- function(obj,outdir=NULL, force=F){
 
 }
 
-remove_blinks <- function(obj)
+interpolate.blinks <- function(y,blinks)
+{
+
+  ## Locate blinks, blink starts and blink ends
+  # A blink starts either when the blink variable goes from 0 to 1
+  # or if its first value is 1. Similarly, a blink ends when the blink
+  # variable goes from 1 to 0 or when the last value is 1.
+
+  y.na <- is.na(y)
+  if (all(!y.na)) return(y) # if no missing data, return y
+  blink.start <- c(which.max(blinks), which(diff(blinks)==1) + 1)
+  blink.start <- unique(blink.start) # remove eventual duplicates
+  blink.end <- c(which(diff(blinks)==-1), max(which(blinks==1)))
+  blink.end <- unique(blink.end) # remove eventual duplicates
+
+  ## Interpolation
+  n <- length(y)
+  x.start <- pmax(blink.start-1,1)
+  x.end <- pmin(blink.end+1,n)
+  for (i in seq_along(x.start)) {
+    xa <- x.start[i]
+    xb <- x.end[i]
+    y[xa:xb] <- spline(x=c(xa,xb), y=c(y[xa],y[xb]), xout=xa:xb)$y
+  }
+
+  return(y)
+}
+
+
+
+
+
+
+remove_blinks <- function(obj, interpolate=FALSE)
 {
 
   obj <- check_for_samples(obj)
@@ -132,10 +165,17 @@ remove_blinks <- function(obj)
     samps$gx[blinks] <-NA
     samps$gy[blinks] <-NA
 
+    if(interpolate){
+
+      samps[, pa := interpolate.blinks(samps$pa,samps$blink)]
+    }
+
+
     saveRDS(samps,obj$samples[[i]],compress = T)
     rm(samps)
 
   }
+
   return(obj)
 }
 
