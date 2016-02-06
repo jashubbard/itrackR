@@ -287,6 +287,8 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     eyes <- obj$epochs$fixations[[event]][[roi]]
     beh <- obj$beh
 
+
+
     realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars))
 
     if(behdata[1] !='all')
@@ -310,6 +312,10 @@ else{
   eyes <- obj[[eyedata]]
   beh <- obj$beh
 
+  #add trial header information
+  beh <- dplyr::left_join(beh,obj$header[c('ID','eyetrial','starttime')], by=c('ID','eyetrial'))
+
+
   #remove the roi_1, roi_2, ... columns
   if(!all.rois && any(grepl('^roi_*',colnames(eyes)))){
     eyes <- dplyr::select(eyes,-matches("^roi_*"))
@@ -330,7 +336,16 @@ else{
   #merge behavioral and eye data
   output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
   output <- dplyr::arrange(output,ID,eyetrial)
+
+  output <- dplyr::rename(output,
+                         trialsttime = starttime)
+
+  output$sttime <- output$sttime - output$trialsttime
+  output$entime <- output$entime - output$trialsttime
+
 }
+
+
 
 
   return(output)
