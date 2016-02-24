@@ -34,6 +34,19 @@ roiFlower <- function(numrois,starting_angle=0,direction='counterclockwise'){
 
 calcHits <- function(obj,rois='all',append=FALSE){
 
+  obj <- calcHits_fixations(obj,rois,append)
+  obj <- calcHits_saccades(obj,rois,append)
+
+  return(obj)
+
+
+
+}
+
+
+
+calcHits_fixations <- function(obj,rois='all',append=FALSE){
+
   allrois <- lapply(obj$rois,function(x) x$roi)
   allnames <- unlist(lapply(obj$rois, function(x) x$name))
 
@@ -65,47 +78,105 @@ calcHits <- function(obj,rois='all',append=FALSE){
 }
 
 
-mapROIs <- function(obj,names,indicators=NULL){
+calcHits_saccades <- function(obj,rois='all',append=FALSE){
 
-  names <- paste0(names,'_hit')
-
-  #if we're re-running this, first remove the existing columns
-  if(any(names(obj$fixations) %in% names))
-    obj$fixations <- obj$fixations[ , -which(names(obj$fixations) %in% names)]
+  allrois <- lapply(obj$rois,function(x) x$roi)
+  allnames <- unlist(lapply(obj$rois, function(x) x$name))
 
 
-  tmp1 <- obj$beh[,c('ID','eyetrial',indicators)] #behavioral data with trial-by-trial indicators
-  tmp2 <- obj$fixations[,c('ID','eyetrial','fixation_key',paste0('roi_',1:length(obj$rois)))] #fixation data with roi hits
-  tmp3 <- merge(tmp1,tmp2,by=c('ID','eyetrial'),all.y=T) #merge them together so we have our indicators for fixation-by-fixation
-  tmp3 <- dplyr::arrange(tmp3,fixation_key) #put in the original order
-  hits <- tmp3[,c(paste0('roi_',1:length(obj$rois)))] #grab only the hit data (since we will use the indicator to index from this)
 
-  #funny hack to handle situations where indicator is NA.
-  #Create a column at the end that is all NAs, so when indexed it fills in that value
-  hits$missing <- NA
-  hits <- as.matrix(hits)
+  if(is.numeric(allnames))
+    allnames <- c(paste0('roi_start_',allnames), paste0('roi_end_',allnames))
 
-  for(i in 1:length(indicators)){
+  hits <- data.frame(saccade_key = obj$saccades$saccade_key)
+  names(hits)[-1] <- allnames
 
-    tmp3[names[i]] <- NA
-
-    #wherever indicator is NA, change to #rois+1, so it indexes the "missing" column created above
-    tmp3[,indicators[i]][is.na(tmp3[,indicators[i]])] <- ncol(hits)
-
-    idx <- sub2ind(hits,1:nrow(tmp3),tmp3[,indicators[i]]) #get the single number indices based on row and column numbers (Indicator corresponds to column number)
-    tmp3[names[i]] <- hits[idx] #grab the actual data based on the single number indices. Yields a single column of hits and misses
-
-    tmp3[,indicators[i]][tmp3[,indicators[i]]==ncol(hits)] <- NA #fill the missing data back with NAs
+  for(i in 1:length(allrois)){
+    hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$saccades$gstx,obj$saccades$gsty,allrois[[i]]))
   }
 
-  #in case we're re-running this, don't create duplicate columns
-  if(any(names(obj$fixations) %in% indicators))
-      obj$fixations <- obj$fixations[ , -which(names(obj$fixations) %in% indicators)]
+  for(i in (length(allrois)+1):(length(allrois)*2)){
+    hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$saccades$genx,obj$saccades$geny,allrois[[i-length(allrois)]]))
+  }
+
+  hits <- hits[,c('saccade_key',paste0('roi_start_',1:length(obj$rois)),paste0('roi_end_',1:length(obj$rois)))]
+
+  if(!append)
+    tmp <- obj$saccades[c('saccade_key','ID','eyetrial','sttime','entime','gstx','gsty','genx','geny')]
+  else
+    tmp <- obj$saccades
+
+  obj$saccades <- cbind(tmp,dplyr::select(hits,-saccade_key))
+
+  return(obj)
+
+}
 
 
-  #merge our existing fixation data with our new mapped data
-  obj$fixations <- merge(obj$fixations,tmp3[,c('fixation_key',indicators,names)],by='fixation_key',all.x=T)
+mapROIs <- function(obj,names,indicators=NULL){
 
+  newnames <- names
+  startnames <- newnames
+
+  for(eyedata in c('fixations','saccades')){
+
+    if(eyedata=='fixations'){
+      keyvar='fixation_key'
+      roivars = paste0('roi_',1:length(obj$rois))
+      newnames <- paste0(startnames,'_hit')
+    }
+    else if(eyedata=='saccades'){
+      keyvar='saccade_key'
+      roivars = c(paste0('roi_start_',1:length(obj$rois)),paste0('roi_end_',1:length(obj$rois)))
+      newnames <- c(paste0(startnames,'_start_hit'),paste0(startnames,'_end_hit'))
+    }
+
+    #if we're re-running this, first remove the existing columns
+    if(any(names(obj[[eyedata]]) %in% newnames))
+      obj[[eyedata]] <- obj[[eyedata]][ , -which(names(obj[[eyedata]]) %in% newnames)]
+
+
+    tmp1 <- obj$beh[,c('ID','eyetrial',indicators)] #behavioral data with trial-by-trial indicators
+    tmp2 <- obj[[eyedata]][,c('ID','eyetrial',keyvar,roivars)] #fixation data with roi hits
+    tmp3 <- merge(tmp1,tmp2,by=c('ID','eyetrial'),all.y=T) #merge them together so we have our indicators for fixation-by-fixation
+    tmp3 <- dplyr::arrange_(tmp3,keyvar) #put in the original order
+    hits <- tmp3[,roivars] #grab only the hit data (since we will use the indicator to index from this)
+
+    #funny hack to handle situations where indicator is NA.
+    #Create a column at the end that is all NAs, so when indexed it fills in that value
+    hits$missing <- NA
+    hits <- as.matrix(hits)
+
+
+
+    for(i in 1:length(indicators)){
+
+      tmp3[newnames[i]] <- NA
+
+      #wherever indicator is NA, change to #rois+1, so it indexes the "missing" column created above
+      tmp3[,indicators[i]][is.na(tmp3[,indicators[i]])] <- ncol(hits)
+
+      idx <- sub2ind(hits,1:nrow(tmp3),tmp3[,indicators[i]]) #get the single number indices based on row and column numbers (Indicator corresponds to column number)
+      tmp3[newnames[i]] <- hits[idx] #grab the actual data based on the single number indices. Yields a single column of hits and misses
+
+      if(eyedata=='saccades'){
+        idx2 <- sub2ind(hits,1:nrow(tmp3),tmp3[,indicators[i]]+length(obj$rois)) #get the single number indices based on row and column numbers (Indicator corresponds to column number)
+        tmp3[newnames[i+length(startnames)]] <- hits[idx2] #grab the actual data based on the single number indices. Yields a single column of hits and misses
+
+      }
+
+      tmp3[,indicators[i]][tmp3[,indicators[i]]==ncol(hits)] <- NA #fill the missing data back with NAs
+    }
+
+    #in case we're re-running this, don't create duplicate columns
+    if(any(names(obj[[eyedata]]) %in% indicators))
+      obj[[eyedata]] <- obj[[eyedata]][ , -which(names(obj[[eyedata]]) %in% indicators)]
+
+
+
+    #merge our existing fixation data with our new mapped data
+    obj[[eyedata]] <- merge(obj[[eyedata]],tmp3[,c(keyvar,indicators,newnames)],by=keyvar,all.x=T)
+  }
   return(obj)
 
 }
