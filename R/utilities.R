@@ -34,6 +34,19 @@ roiFlower <- function(numrois,starting_angle=0,direction='counterclockwise'){
 
 calcHits <- function(obj,rois='all',append=FALSE){
 
+  obj <- calcHits_fixations(obj,rois,append)
+  obj <- calcHits_saccades(obj,rois,append)
+
+  return(obj)
+
+
+
+}
+
+
+
+calcHits_fixations <- function(obj,rois='all',append=FALSE){
+
   allrois <- lapply(obj$rois,function(x) x$roi)
   allnames <- unlist(lapply(obj$rois, function(x) x$name))
 
@@ -59,6 +72,41 @@ calcHits <- function(obj,rois='all',append=FALSE){
     tmp <- obj$fixations
 
   obj$fixations <- cbind(tmp,dplyr::select(hits,-fixation_key))
+
+  return(obj)
+
+}
+
+
+calcHits_saccades <- function(obj,rois='all',append=FALSE){
+
+  allrois <- lapply(obj$rois,function(x) x$roi)
+  allnames <- unlist(lapply(obj$rois, function(x) x$name))
+
+
+
+  if(is.numeric(allnames))
+    allnames <- c(paste0('roi_start_',allnames), paste0('roi_end_',allnames))
+
+  hits <- data.frame(saccade_key = obj$saccades$saccade_key)
+  names(hits)[-1] <- allnames
+
+  for(i in 1:length(allrois)){
+    hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$saccades$gstx,obj$saccades$gsty,allrois[[i]]))
+  }
+
+  for(i in (length(allrois)+1):(length(allrois)*2)){
+    hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$saccades$genx,obj$saccades$geny,allrois[[i-5]]))
+  }
+
+  hits <- hits[,c('saccade_key',paste0('roi_start_',1:length(obj$rois)),paste0('roi_end_',1:length(obj$rois)))]
+
+  if(!append)
+    tmp <- obj$saccades[c('saccade_key','ID','eyetrial','sttime','entime','gstx','gsty','genx','geny')]
+  else
+    tmp <- obj$saccades
+
+  obj$saccades <- cbind(tmp,dplyr::select(hits,-saccade_key))
 
   return(obj)
 
