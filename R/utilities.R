@@ -96,7 +96,9 @@ calcHits_saccades <- function(obj,rois='all',append=FALSE){
   }
 
   for(i in (length(allrois)+1):(length(allrois)*2)){
+
     hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$saccades$genx,obj$saccades$geny,allrois[[i-length(allrois)]]))
+
   }
 
   hits <- hits[,c('saccade_key',paste0('roi_start_',1:length(obj$rois)),paste0('roi_end_',1:length(obj$rois)))]
