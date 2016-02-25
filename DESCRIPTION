@@ -1,12 +1,12 @@
 Package: itrackR
 Type: Package
-Title: High-level workflow for eyetracking data analysis
+Title: itrackR - eyetracking analysis
 Version: 0.1
 Date: 2015-11-09
-Author: Who wrote it
+Author: Jason Hubbard
 Maintainer: Jason Hubbard <hubbard3@uoregon.edu>
-Description: More about what it does (maybe more than one line)
-License: What license is it under?
+Description: A package for high-level analyses of eyetracking data
+License: GPL
 LazyData: TRUE
 Imports:
     doParallel,
@@ -23,3 +23,6 @@ Depends:
     foreach,
     magrittr,
     data.table
+Suggests: knitr,
+    rmarkdown
+VignetteBuilder: knitr

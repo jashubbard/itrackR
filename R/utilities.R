@@ -212,8 +212,8 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df <- obj$fixations[,c('ID','eyetrial','fixation_key',startvar,endvar,hitvar)]
   df <- merge(df,eventdata,by=c('ID','eyetrial'),all.x=T)
   df <- dplyr::arrange(df,fixation_key)
-  df[startvar] <- df[,startvar] - df$starttime
-  df[endvar] <- df[,endvar] - df$starttime
+#   df[startvar] <- df[,startvar] - df$starttime
+#   df[endvar] <- df[,endvar] - df$starttime
   df[event] <- df[,event] - df$starttime
 
   #bin the data based on saccade start time and bin width (in ms)
@@ -438,5 +438,23 @@ detect.saccades <- function(samples, lambda=15, smooth.saccades=T) {
 
   samples
 
+}
+
+itrackR.data <- function(data){
+
+  #get path to data folder
+  d <- paste0(system.file('data', package='itrackR'), .Platform$file.sep)
+
+  #find all edfs, get full path of each
+  edfs <-  list.files(path=d,'*.edf')
+  edfs <- file.path(d,edfs)
+
+  #return the proper data,depending on what we ask for
+  output <- switch(data,
+         path = d,
+         edfs = edfs,
+         beh = readRDS(file.path(d,'beh.rds')))
+
+  return(output)
 }
 

@@ -323,11 +323,11 @@ else{
 
   #if we want only some of the behavioral variables
   if(behdata[1] !='all')
-    beh <- dplyr::select_(beh,.dots=unique(c('ID','eyetrial',obj$indexvars,behdata)))
+    beh <- dplyr::select_(beh,.dots=unique(c('ID','eyetrial','starttime',obj$indexvars,behdata)))
 
   #in case there are variable names in common between eyedata and behdata, besides index variables
   #remove them from eyedata
-  realvars <- setdiff(colnames(eyes),c('ID','eyetrial',obj$indexvars))
+  realvars <- setdiff(colnames(eyes),c('ID','eyetrial','starttime',obj$indexvars))
   commonvars <- intersect(realvars,colnames(beh))
 
   if(length(commonvars)>0)
