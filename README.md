@@ -1,15 +1,6 @@
----
-title: "itrackR Basics"
-author: "Jason Hubbard"
-date: "2016-02-25"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Vignette Title}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
----
+##itrackR
 
-This will acquaint you with some of the basics of itrackR. There are a number of function for doing high-level analyses of eyetracking data. 
+itrackR is an R package for high-level analyses of eyetracking data. For now it is only compatible with EDF files from SR-Research Eyelink eyetrackers. **This is currently a work-in-progress.** Functions are missing documentation, but you can see an example of a full analysis with `vignettes('itrackR')`. Here is a snippet of that document: 
 
 
 ##Example Data
@@ -24,43 +15,6 @@ edfs <- itrackR.data('edfs')
 beh <- itrackR.data('beh')
 ```
 
-`datapath` will point to the data folder wherever itrackR is installed:
-
-
-```r
-datapath
-```
-
-```
-## [1] "/Library/Frameworks/R.framework/Versions/3.2/Resources/library/itrackR/data/"
-```
-`edfs` is a list of the 2 edfs found in that folder: 
-
-
-```r
-edfs
-```
-
-```
-## [1] "/Library/Frameworks/R.framework/Versions/3.2/Resources/library/itrackR/data//104_exp.edf"
-## [2] "/Library/Frameworks/R.framework/Versions/3.2/Resources/library/itrackR/data//105_exp.edf"
-```
-
-`beh` is a data frame of the behavioral data for the same 2 subjects. 
-
-
-|  ID| Block| Trial| Task| Conflict| Targetpos| Distractorpos|
-|---:|-----:|-----:|----:|--------:|---------:|-------------:|
-| 104|     1|     1|    1|        1|         2|            11|
-| 104|     1|     2|    1|        0|         4|            NA|
-| 104|     1|     3|    1|        0|         2|            NA|
-| 104|     1|     4|    1|        0|         6|            NA|
-| 104|     1|     5|    1|        0|         4|            NA|
-| 104|     1|     6|    1|        0|         2|            NA|
-| 104|     1|     7|    1|        1|         3|             8|
-| 104|     1|     8|    1|        1|         6|             9|
-| 104|     1|     9|    1|        1|         6|             9|
-| 104|     1|    10|    1|        1|         3|             7|
 
 ## Loading Data
 
@@ -71,23 +25,6 @@ We start by initializing the itrackR object and loading the data. This can be do
 z <- itrackr(edfs=edfs)
 ```
 
-```
-## Loading file /Library/Frameworks/R.framework/Versions/3.2/Resources/library/itrackR/data//104_exp.edf
-## Loading Events (59201 events across 1325 trials)....
-## Done with 104_exp
-## 
-## Loading file /Library/Frameworks/R.framework/Versions/3.2/Resources/library/itrackR/data//105_exp.edf
-## Loading Events (61362 events across 1325 trials)....
-## Done with 105_exp
-## 
-## 
-## Done processing all files!
-```
-
-```r
-#Alternatively, we can provide the path and a search pattern to find all edfs in a certain folder:
-#z <- itrackr(path=datapath, pattern='*.edf')
-```
 
 ## Object Structure
 
@@ -159,10 +96,8 @@ We use `makeROIs` to specify them. We can make elliptical or circular ROIs. Firs
 ```r
 #make elliptical ROIs and plot them
 z <- makeROIs(z,innercoords,shape='ellipse',xradius=60, yradius=120, angles=angles[c(1,3,5,7,9,11)])
-plot.rois(z)
-```
 
-![plot of chunk unnamed-chunk-10](figure/unnamed-chunk-10-1.png)
+```
 
 Now we add the outer ROIs. We make sure and specify the `append` option, and also provide names. For now, names are limited to numbers. If you don't specify them, it will just use 1...n.
 
@@ -170,10 +105,7 @@ Now we add the outer ROIs. We make sure and specify the `append` option, and als
 ```r
 #make elliptical ROIs and plot them
 z <- makeROIs(z,outercoords,shape='ellipse',xradius=60, yradius=120, angles=angles[c(2,4,6,8,10,12)], names=7:12, append=T)
-plot.rois(z)
 ```
-
-![plot of chunk unnamed-chunk-11](figure/unnamed-chunk-11-1.png)
 
 Finally let's include a central, circular ROI. 
 
@@ -201,28 +133,7 @@ plot(z, zoom=TRUE)
 
 ## Merging with behavioral data
 
-Ideally, we send a message to Eyelink on every trial in order to identify it in the EDF file. Every time the eyetracker is started and stopped, we call this a separate trial. In this example, every trial the message "BLOCK X" and "TRIAL X" was sent to eyelink. We can see the trial-wise information in the header of our object: 
-
-`z$header`
-
-```r
-knitr::kable(head(z$header, 10))
-```
-
-
-
-| eyetrial| starttime| endtime| duration|  ID|
-|--------:|---------:|-------:|--------:|---:|
-|        1|    220491|  280546|    60055| 104|
-|        2|    306488|  310209|     3721| 104|
-|        3|    310245|  312492|     2247| 104|
-|        4|    312531|  314339|     1808| 104|
-|        5|    314376|  316290|     1914| 104|
-|        6|    316324|  318635|     2311| 104|
-|        7|    318675|  320693|     2018| 104|
-|        8|    320724|  323834|     3110| 104|
-|        9|    323864|  326202|     2338| 104|
-|       10|    326228|  328290|     2062| 104|
+Ideally, we send a message to Eyelink on every trial in order to identify it in the EDF file. Every time the eyetracker is started and stopped, we call this a separate trial. In this example, every trial the message "BLOCK X" and "TRIAL X" was sent to eyelink.
 
 Next we specify index variables that uniquely identify trials. This should be present in both the edf and behavioral file. `set_index` searches through the messages, finds the relevant ones, and extracts the numeric data. `set_index` can take a regular expression to find anything that matches this pattern, and `numeric.only` tells it to ignore any text (e.g., "BLOCK "). The variable names are stored in `z$indexvars` and the information is added to `z$header`.
 
@@ -257,44 +168,9 @@ Now `z$beh` contains the behavioral data that matches with the eyetracking data,
 | 104|     1|    18|    1|        0|         4|            NA|       19|      1074|     2027|
 
 
-We can also see that the header has been updated
-
-`z$header`
-
-```r
-knitr::kable(head(z$header, 10))
-```
 
 
 
-| eyetrial| starttime| endtime| duration|  ID| Block| Trial| STIMONSET| RESPONSE|
-|--------:|---------:|-------:|--------:|---:|-----:|-----:|---------:|--------:|
-|        1|    220491|  280546|    60055| 104|    NA|    NA|        NA|       NA|
-|        2|    306488|  310209|     3721| 104|     1|     1|    307588|   310200|
-|        3|    310245|  312492|     2247| 104|     1|     2|    311315|   312488|
-|        4|    312531|  314339|     1808| 104|     1|     3|    313600|   314336|
-|        5|    314376|  316290|     1914| 104|     1|     4|    315456|   316288|
-|        6|    316324|  318635|     2311| 104|     1|     5|    317393|   318632|
-|        7|    318675|  320693|     2018| 104|     1|     6|    319745|   320687|
-|        8|    320724|  323834|     3110| 104|     1|     7|    321789|   323831|
-|        9|    323864|  326202|     2338| 104|     1|     8|    324928|   326199|
-|       10|    326228|  328290|     2062| 104|     1|     9|    327292|   328287|
-
-
-##Drift Correction
-
-It looks like subject 104 is off-center, due to poor calibration. We can correct for this using `drift_correct`. We can optionally specify a grouping variable (from the behavioral data) so that correction is done separately for each level of that variable. In this case, let's perform correction for each subject and block. The threshold specifies the minimum amount of movement detected before we actually do any correction.
-
-
-```r
-z <- drift_correct(z,vars='Block',threshold=15) 
-plot(z,zoom=T)
-```
-
-![plot of chunk unnamed-chunk-18](figure/unnamed-chunk-18-1.png)
-
-
-Much better!
 
 ##Determining Fixation/Saccade "Hits"
 
@@ -305,27 +181,6 @@ Next we code whether each fixation and saccade "hit" any of the ROIs using `calc
 z <- calcHits(z)
 ```
 
-Note that the `fixations` data frame now has binary vectors for each ROI specifying whether the fixation hit that item or not:
-
-
-```r
-knitr::kable(head(z$fixations, 10))
-```
-
-
-
-| fixation_key|  ID| eyetrial| sttime| entime|  gavx|  gavy| roi_1| roi_2| roi_3| roi_4| roi_5| roi_6| roi_7| roi_8| roi_9| roi_10| roi_11| roi_12| roi_13|
-|------------:|---:|--------:|------:|------:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|------:|------:|------:|------:|
-|            1| 104|        1|     NA|     NA| 477.4| 433.5|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
-|            2| 104|        1|     NA|     NA| 511.5| 409.5|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
-|            3| 104|        1|     NA|     NA| 503.9| 396.8|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
-|            4| 104|        1|     NA|     NA| 511.3| 399.7|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
-|            5| 104|        1|     NA|     NA| 508.7| 401.3|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
-|            6| 104|        1|     NA|     NA| 518.2| 406.3|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
-|            7| 104|        1|     NA|     NA| 483.6| 437.3|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
-|            8| 104|        1|     NA|     NA| 513.1| 406.7|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
-|            9| 104|        1|     NA|     NA| 511.2| 416.9|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
-|           10| 104|        1|     NA|     NA| 515.6| 411.5|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|
 
 This is not terribly useful if your task-relevant ROI changes positions on each trial. You can use `mapROIs` map your experiment-wide ROIs (1,2,3...13) to trial-specific ROIs ('target','distractor'). You just need a variable in your behavioral data that specifies the number of the relevant ROI. Here, `Targetpos` specifies the target location, and `Distractorpos` specifies the distractor location: 
 
@@ -334,27 +189,6 @@ This is not terribly useful if your task-relevant ROI changes positions on each 
 z <- mapROIs(z,names=c('target','distractor'),indicators=c('Targetpos','Distractorpos'))
 ```
 
-Now we can see a `target_hit` and `distractor_hit` variable in our fixation data frame
-
-
-```r
-knitr::kable(head(z$fixations, 10))
-```
-
-
-
-| fixation_key|  ID| eyetrial| sttime| entime|  gavx|  gavy| roi_1| roi_2| roi_3| roi_4| roi_5| roi_6| roi_7| roi_8| roi_9| roi_10| roi_11| roi_12| roi_13| Targetpos| Distractorpos| target_hit| distractor_hit|
-|------------:|---:|--------:|------:|------:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|------:|------:|------:|------:|---------:|-------------:|----------:|--------------:|
-|            1| 104|        1|     NA|     NA| 477.4| 433.5|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
-|            2| 104|        1|     NA|     NA| 511.5| 409.5|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
-|            3| 104|        1|     NA|     NA| 503.9| 396.8|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
-|            4| 104|        1|     NA|     NA| 511.3| 399.7|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
-|            5| 104|        1|     NA|     NA| 508.7| 401.3|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
-|            6| 104|        1|     NA|     NA| 518.2| 406.3|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
-|            7| 104|        1|     NA|     NA| 483.6| 437.3|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
-|            8| 104|        1|     NA|     NA| 513.1| 406.7|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
-|            9| 104|        1|     NA|     NA| 511.2| 416.9|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
-|           10| 104|        1|     NA|     NA| 515.6| 411.5|     0|     0|     0|     0|     0|     0|     0|     0|     0|      0|      0|      0|      1|        NA|            NA|         NA|             NA|
 
 ##Saving data
 
@@ -370,52 +204,3 @@ saccs <- eyemerge(z,'saccades',behdata=c('Task'))
 #by default only mapped ROIs are included. Here we can include all 13 rois, plus the mapped ones
 fixes_all <- eyemerge(z,'fixations',all.rois = T)
 ```
-
-
-## Timeseries plots
-Sometimes you want to see the tendency of the eyes to look at a particular ROI over time, relevative to some event. To look at this, we first determine epochs around our event of interest, in this case, `STIMONSET`. We first run `epoch_fixations` for each ROI that we're interested in. 
-
-
-```r
-#start at stimulus onset, going 700ms after that point. Bin the data into 25ms time bins. 
-z <- epoch_fixations(z,'target',event='STIMONSET',start = 0, end = 700, binwidth = 25)
-z <- epoch_fixations(z,'distractor',event='STIMONSET',start = 0, end = 700, binwidth = 25)
-```
-
-Next we want to visualize these timeseries using `plot.timeseries`. We can generate separate lines for each level of a factor (specified in the behavioral data) or for different ROIs. You can specify variables that define the different lines, as well as the rows and columns in separate panels. Behind the scenes, the function first aggregates based on `ID` and the factors your specify, then across subjects. 
-
-
-```r
-#plot the timeseries data for fixations to target, separately for the Conflict and Task conditions
-plot.timeseries(z,event='STIMONSET',rois=c('target'),lines=c('Conflict'),cols='Task')
-```
-
-```
-## Warning: Removed 1 rows containing missing values (geom_point).
-```
-
-![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-1.png)
-
-```r
-#plot fixations to target and disctractor for the same conditions
-#you must specify 'roi' as one of the plotting variables for it to work. 
-plot.timeseries(z,event='STIMONSET',rois=c('target','distractor'),lines=c('roi','Conflict'),cols='Task')
-```
-
-```
-## Warning: Removed 57 rows containing missing values (geom_point).
-```
-
-![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-2.png)
-
-```r
-#plot difference waves (target - distractor fixations). Plot on separate rows insetead of columns.
-#This example doesn't make much sense because distractors aren't present on no-conflict trials
-plot.timeseries(z,event='STIMONSET',rois=c('target','distractor'),lines=c('roi','Conflict'),rows='Task',difference=T)
-```
-
-```
-## Warning: Removed 56 rows containing missing values (geom_point).
-```
-
-![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-3.png)
