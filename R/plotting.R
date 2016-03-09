@@ -37,8 +37,8 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
 
   if(crosshairs){
     p <- p +
-      ggplot2::geom_hline(yintercept=round(z$resolution[2]/2),color='red',size=0.3,linetype='dashed') +
-      ggplot2::geom_vline(xintercept=round(z$resolution[1]/2),color='red',size=0.3,linetype='dashed')
+      ggplot2::geom_hline(yintercept=round(obj$resolution[2]/2),color='red',size=0.3,linetype='dashed') +
+      ggplot2::geom_vline(xintercept=round(obj$resolution[1]/2),color='red',size=0.3,linetype='dashed')
   }
 
 
@@ -130,7 +130,7 @@ plot_random_epochs <- function(epochs,n=100)
   lastpoint <- gsub(colnames(epochs)[ncol(epochs)],'t','')
   lastpoint <- as.numeric(gsub(lastpoint,'_','-'))
 
-  matplot(t(as.matrix(tmp)),type='l',lty=1,axes=FALSE)
+  matplot(t(as.matrix(epochs)),type='l',lty=1,axes=FALSE)
 
   axis(2)
   axis(1,at=seq(firstpoint,lastpoint,100),labels=seq(firstpoint,lastpoint,100)-(firstpoint))

@@ -139,7 +139,10 @@ interpolate.blinks <- function(y,blinks)
   for (i in seq_along(x.start)) {
     xa <- x.start[i]
     xb <- x.end[i]
-    y[xa:xb] <- spline(x=c(xa,xb), y=c(y[xa],y[xb]), xout=xa:xb)$y
+    if(!all(is.na(c(y[xa],y[xb]))))
+      y[xa:xb] <- spline(x=c(xa,xb), y=c(y[xa],y[xb]), xout=xa:xb)$y
+    else
+      y[xa:xb] <- y[xa-1]
   }
 
   return(y)
@@ -168,6 +171,8 @@ remove_blinks <- function(obj, interpolate=FALSE)
     if(interpolate){
 
       samps[, pa := interpolate.blinks(samps$pa,samps$blink)]
+      samps[, gx := interpolate.blinks(samps$gx,samps$blink)]
+      samps[, gy := interpolate.blinks(samps$gy,samps$blink)]
     }
 
 
