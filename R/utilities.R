@@ -300,7 +300,7 @@ do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='lo
   epoch_end <- df$epoch_end[1]
   binwidth <- df$binwidth[1]
 
-  binnames <- names(df)[grepl(paste0(prefix,'[_0-9]'),names(df))]
+  binnames <- names(df)[grepl(paste0('^',prefix,'[_0-9]'),names(df))]
   df <- tidyr::gather_(df,'bin','val',binnames)
 
   #aggregate by trial(max)

@@ -65,7 +65,7 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
   tmp <- agg
   tmp$bin <- gsub('t','',tmp$bin)
   tmp$bin <- as.numeric(gsub('_','-',tmp$bin))
-  tmp$bin <- tmp$epoch_start + (tmp$bin-1)*tmp$binwidth
+  tmp$bin <- (tmp$bin)*tmp$binwidth
   tmp$lines <- interaction(agg[,lines])
 
   if(!is.null(rows)){
@@ -82,7 +82,10 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
   plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=lines,color=lines))+
     ggplot2::geom_line(size=.75) +
     ggplot2::geom_point(size=3) + ggplot2::xlab('time (ms)') + ggplot2::ylab('probability of fixation (%)') +
-    ggplot2::scale_color_discrete(name = toString(lines))
+    ggplot2::geom_vline(ggplot2::aes(xintercept = 0), alpha=0.5, linetype='dashed') +
+    ggplot2::scale_color_discrete(name = toString(lines)) +
+    ggplot2::scale_x_continuous(breaks = seq(min(tmp$bin),max(tmp$bin),100))
+
 
 
   if (!is.null(rows) | !is.null(cols)){
@@ -98,20 +101,27 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
     plt <- plt + ggplot2::facet_grid(facetexp)
   }
 
-  plt <- plt + ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'white'),
-                               panel.border = ggplot2::element_blank(),
-                               axis.line = ggplot2::element_line(),
-                               panel.grid.major = ggplot2::element_blank(),
-                               panel.grid.minor = ggplot2::element_blank())
+
+
+  plt <- plt + ggplot2::theme(panel.background = ggplot2::element_blank(),
+                              panel.border = ggplot2::element_blank(),
+                              axis.line.x = ggplot2::element_line(color="black", size = .5),
+                              axis.line.y = ggplot2::element_line(color="black", size = .5),
+                              axis.text.x = ggplot2::element_text(size=14,vjust=-0.9),
+                              axis.title.x = ggplot2::element_text(size=16,vjust=-1.5),
+                              axis.text.y = ggplot2::element_text(size=14),
+                              axis.title.y = ggplot2::element_text(size=16,vjust= -1.5),
+                              panel.grid.major = ggplot2::element_blank(),
+                              panel.grid.minor = ggplot2::element_blank())
 
 
 
-    plt
 
     output = list()
     output$plt <- plt
-    output$data <- agg
+    output$data <- tmp
 
+    plt
 
   return(output)
 
