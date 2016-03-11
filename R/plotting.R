@@ -64,7 +64,7 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
 
   tmp <- agg
   tmp$bin <- gsub('t','',tmp$bin)
-  tmp$bin <- as.numeric(gsub('_','',tmp$bin))
+  tmp$bin <- as.numeric(gsub('_','-',tmp$bin))
   tmp$bin <- tmp$epoch_start + (tmp$bin-1)*tmp$binwidth
   tmp$lines <- interaction(agg[,lines])
 
@@ -108,7 +108,12 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
 
     plt
 
-  return(list(plt,agg))
+    output = list()
+    output$plt <- plt
+    output$data <- agg
+
+
+  return(output)
 
 
 }
