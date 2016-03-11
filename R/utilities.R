@@ -203,7 +203,13 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
 
   startvar <- 'sttime'
   endvar <- 'entime'
-  hitvar <- paste0(roi,'_hit')
+
+  if(is.numeric(roi))
+    hitvar <- paste0('roi_',roi)
+  else
+    hitvar <- paste0(roi,'_hit')
+
+
   prefix = 't'
   firstbin <- (ceiling(start/binwidth))
   numbins = ((end - start)/binwidth)+1

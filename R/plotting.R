@@ -108,7 +108,7 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
 
     plt
 
-  return(plt)
+  return(list(plt,agg))
 
 
 }
