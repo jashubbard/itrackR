@@ -205,7 +205,9 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   endvar <- 'entime'
   hitvar <- paste0(roi,'_hit')
   prefix = 't'
-  numbins = (end - start)/binwidth
+  firstbin <- (ceiling(start/binwidth))
+  numbins = ((end - start)/binwidth)+1
+  lastbin <- firstbin + numbins-1
 
   eventdata <- obj$header[,c('ID','eyetrial','starttime',event)]
 
@@ -219,14 +221,22 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df$bin_start <- ceiling((df[,startvar] - df[,event])/binwidth)
   df$bin_end <- ceiling((df[,endvar] - df[,event])/binwidth)
   #throw out saccades before stim onset and after numbins
-  df <- subset(df,bin_start>start & bin_end<=numbins)
+  df <- subset(df,bin_start>=firstbin & bin_end<=lastbin)
 
   #convert to "trial time"
   df[startvar] <- df[,startvar] - df$starttime
   df[endvar] <- df[,endvar] - df$starttime
+  df[event] <- df[,event] - df$starttime
 
+  if(start<0){
+    start_adj = df$bin_start + abs(firstbin)+1
+    end_adj = df$bin_end + abs(firstbin)+1
+    intervals<- apply(cbind(start_adj,end_adj),1,function(x) x[1]:x[2])
+  }
+  else {
   #create intervals (start_bin:end_bin)
   intervals<- apply(df[c('bin_start','bin_end')],1,function(x) x[1]:x[2])
+  }
 
   #create a vector for each saccade (numbins wide). Fill with NA, then put 1's wherever saccade occurred (start_bin:end_bin)
   f2 <- function(x){
@@ -244,7 +254,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   vectors <- sweep(vectors,MARGIN=1,df[,hitvar],'*')
 
   #save the result in our data frame
-  vars = paste0(prefix,1:numbins)
+  vars = gsub('-','_',paste0(prefix,firstbin:lastbin))
   df[vars] <- vectors
 
   #merge with our behavioral data
@@ -252,7 +262,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df$epoch_start <- start
   df$epoch_end <- end
   df$binwidth <- binwidth
-  df <- df[,c('ID','eyetrial','fixation_key','roi','epoch_start','epoch_end','binwidth',startvar,endvar,hitvar,vars)]
+  df <- df[,c('ID','eyetrial','fixation_key','roi','epoch_start','epoch_end','binwidth',startvar,endvar,'bin_start','bin_end',event,hitvar,vars)]
 
   df <- merge(obj$beh[c('ID','eyetrial',obj$indexvars)],df,by=c('ID','eyetrial'),all.y=T)
   df <- dplyr::arrange(df,fixation_key)
@@ -284,7 +294,7 @@ do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='lo
   epoch_end <- df$epoch_end[1]
   binwidth <- df$binwidth[1]
 
-  binnames <- names(df)[grepl(paste0(prefix,'[0-9]'),names(df))]
+  binnames <- names(df)[grepl(paste0(prefix,'[_0-9]'),names(df))]
   df <- tidyr::gather_(df,'bin','val',binnames)
 
   #aggregate by trial(max)

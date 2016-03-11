@@ -63,7 +63,8 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
   othervars <- names(agg)[-which(names(agg) %in% mainvars)]
 
   tmp <- agg
-  tmp$bin <- as.numeric(gsub('t','',tmp$bin))
+  tmp$bin <- gsub('t','',tmp$bin)
+  tmp$bin <- as.numeric(gsub('_','',tmp$bin))
   tmp$bin <- tmp$epoch_start + (tmp$bin-1)*tmp$binwidth
   tmp$lines <- interaction(agg[,lines])
 
