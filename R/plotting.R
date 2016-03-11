@@ -176,7 +176,7 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
   obj <- check_for_samples(obj)
 
   #find the appropriate file that matches the ID you want
-  sampfile <- unlist(z$samples[grepl(ID,z$samples)])
+  sampfile <- unlist(obj$samples[grepl(ID,obj$samples)])
 
   #load in sample data
   samps <- readRDS(sampfile)

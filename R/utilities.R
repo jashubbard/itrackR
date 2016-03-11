@@ -212,9 +212,8 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df <- obj$fixations[,c('ID','eyetrial','fixation_key',startvar,endvar,hitvar)]
   df <- merge(df,eventdata,by=c('ID','eyetrial'),all.x=T)
   df <- dplyr::arrange(df,fixation_key)
-#   df[startvar] <- df[,startvar] - df$starttime
-#   df[endvar] <- df[,endvar] - df$starttime
-  df[event] <- df[,event] - df$starttime
+
+
 
   #bin the data based on saccade start time and bin width (in ms)
   df$bin_start <- ceiling((df[,startvar] - df[,event])/binwidth)
@@ -222,6 +221,9 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   #throw out saccades before stim onset and after numbins
   df <- subset(df,bin_start>start & bin_end<=numbins)
 
+  #convert to "trial time"
+  df[startvar] <- df[,startvar] - df$starttime
+  df[endvar] <- df[,endvar] - df$starttime
 
   #create intervals (start_bin:end_bin)
   intervals<- apply(df[c('bin_start','bin_end')],1,function(x) x[1]:x[2])
