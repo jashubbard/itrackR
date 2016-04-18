@@ -287,7 +287,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
 }
 
 
-do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='long'){
+do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='long',filter=NULL){
   idvar <- 'ID'
   prefix <- 't'
 
@@ -339,7 +339,7 @@ do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='lo
 }
 
 
-aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',difference=FALSE){
+aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',difference=FALSE,filter=NULL){
 
   agg <- data.frame()
 
@@ -379,7 +379,8 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
                                             roi=r,
                                             groupvars = groupvars,
                                             shape=shape,
-                                            level=level)
+                                            level=level,
+                                            filter = filter)
 
     agg <- rbind(agg,aggtmp)
   }
