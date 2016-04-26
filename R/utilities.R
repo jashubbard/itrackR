@@ -221,7 +221,8 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df <- merge(df,eventdata,by=c('ID','eyetrial'),all.x=T)
   df <- dplyr::arrange(df,fixation_key)
 
-
+  #convert to "trial time"
+  df[event] <- df[,event] - df$starttime
 
   #bin the data based on saccade start time and bin width (in ms)
   df$bin_start <- ceiling((df[,startvar] - df[,event])/binwidth)
@@ -230,9 +231,9 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df <- subset(df,bin_start>=firstbin & bin_end<=lastbin)
 
   #convert to "trial time"
-  df[startvar] <- df[,startvar] - df$starttime
-  df[endvar] <- df[,endvar] - df$starttime
-  df[event] <- df[,event] - df$starttime
+  # df[startvar] <- df[,startvar] - df$starttime
+  # df[endvar] <- df[,endvar] - df$starttime
+
 
   if(start<0){
     start_adj = df$bin_start + abs(firstbin)+1

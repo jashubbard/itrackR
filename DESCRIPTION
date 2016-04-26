@@ -18,7 +18,9 @@ Imports:
     ggplot2,
     dplyr,
     tidyr,
-    spatstat
+    spatstat,
+    pracma,
+    R.utils
 Depends:
     foreach,
     magrittr,
