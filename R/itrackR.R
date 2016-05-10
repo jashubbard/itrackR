@@ -1,5 +1,5 @@
 #class constructor
-itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir())
+itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir(),ID_numeric.only = TRUE)
 {
 
   me <- list(
@@ -34,7 +34,7 @@ itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1
     me <- load_edfs(me,path=path,pattern=pattern)
 
   if(!is.null(txt))
-    me <- load_txt(me,filename=txt)
+    me <- load_txt(me,filename=txt, ID_numeric.only)
 
   return(me)
 
@@ -76,7 +76,7 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 }
 
 
-load_txt <- function(obj,type='fixations',filename,sep='\t'){
+load_txt <- function(obj,type='fixations',filename,sep='\t', ID_numeric.only = TRUE){
 
 
 if(type=='fixations')
@@ -112,9 +112,9 @@ else if(type=='saccades'){
 }
 
 
-
-
-fixdata$ID <- as.numeric(gsub("([0-9]*).*","\\1",fixdata$ID))
+if(ID_numeric.only) {
+	fixdata$ID <- as.numeric(gsub("([0-9]*).*","\\1",fixdata$ID))
+}
 
 obj$fixations <- dplyr::select(fixdata,ID,eyetrial,sttime,entime,gavx,gavy,fixation_key)
 
