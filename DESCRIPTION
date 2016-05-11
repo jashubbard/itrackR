@@ -18,11 +18,14 @@ Imports:
     ggplot2,
     dplyr,
     tidyr,
-    spatstat
+    spatstat,
+    knitr,
+    R.utils,
+    pracma
 Depends:
     foreach,
     magrittr,
     data.table
-Suggests: knitr,
+Suggests:
     rmarkdown
 VignetteBuilder: knitr
