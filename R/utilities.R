@@ -340,7 +340,7 @@ do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='lo
 }
 
 
-aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',difference=FALSE,filter=NULL){
+aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',difference=FALSE,logRatio=FALSE,filter=NULL){
 
   agg <- data.frame()
 
@@ -354,6 +354,34 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
       stop('Epochs/binning is different for the different ROIs. Data will not match up')
 
     aggID$val <- aggID$val.x - aggID$val.y
+
+    aggID <- dplyr::rename(aggID,
+                           epoch_start = epoch_start.x,
+                           epoch_end = epoch_end.x,
+                           binwidth = binwidth.x)
+
+    aggID <- dplyr::select(aggID,ID,Task,Conflict,bin,val,epoch_start,epoch_end,binwidth)
+
+
+    if(level=='group'){
+      agg <- dplyr::group_by(aggID,bin,Task,Conflict,epoch_start,epoch_end,binwidth) %>%
+        dplyr::summarise(val = mean(val,na.rm=T))
+    }
+    else
+      agg <- aggID
+
+    agg$roi <- 'difference'
+
+  } else if(logRatio && length(rois==2)){
+    aggID_one <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[1],groupvars = c('Task','Conflict'),shape='long',level='ID')
+    aggID_two <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[2],groupvars = c('Task','Conflict'),shape='long',level='ID')
+
+    aggID <- merge(aggID_one,aggID_two,by=c('ID','Task','Conflict','bin'))
+
+    if( ( (!all(aggID$binwidth.x==aggID$binwidth.y)) || (!all(aggID$epoch_start.x==aggID$epoch_start.y)) || (!all(aggID$epoch_end.x==aggID$epoch_end.y)) ))
+      stop('Epochs/binning is different for the different ROIs. Data will not match up')
+
+    aggID$val <- log(aggID$val.x / aggID$val.y)
 
     aggID <- dplyr::rename(aggID,
                            epoch_start = epoch_start.x,

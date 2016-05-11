@@ -3,13 +3,17 @@
 #
 # }
 
-plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',names=FALSE){
+plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',names=FALSE,IDs=c()){
 
-
+  
+  if (length(IDs) != 0) {
+    obj$fixations = subset(obj$fixations, ID %in% IDs)
+  }
+  
   if(rois && !is.null(obj$rois)){
     df <- rois2df(obj)
 
-    if(which !='all')
+    if(which[1] !='all')
       df <- subset(df,name %in% which)
 
 
@@ -24,7 +28,7 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
 
 
   if(zoom)
-    p <- p+ggplot2::coord_cartesian(xlim=c(0,obj$resolution[1]), ylim=c(obj$resolution[2],0))
+    p <- p + ggplot2::coord_cartesian(xlim=c(0,obj$resolution[1]), ylim=c(obj$resolution[2],0))
   else
     p <- p + ggplot2::coord_cartesian(xlim=c(0,max(obj$fixations$gavx)), ylim=c(max(obj$fixations$gavy),0))
 
@@ -50,7 +54,7 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
 }
 
 
-plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='group',difference=FALSE,filter=NULL){
+plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='group',difference=FALSE,logRatio=FALSE,filter=NULL){
 
   agg <- aggregate_fixation_timeseries(obj,event=event,
                                        rois=rois,
@@ -58,6 +62,7 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
                                        shape='long',
                                        level=level,
                                        difference=difference,
+                                       logRatio=logRatio,
                                        filter=NULL)
 
   mainvars <- c('bin','val','roi','epoch_start','epoch_end','binwidth')
@@ -160,12 +165,10 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 
   df <- rois2df(obj)
 
-  if(which !='all')
+  if(which[1] !='all')
     df <- subset(df,name %in% which)
 
   p <- ggplot2::ggplot() + ggplot2::geom_polygon(data=df, ggplot2::aes(x=x,y=y,group=name),fill='gray',alpha=0.5)+
-
-
     ggplot2::geom_text(data=unique(df[c('xcenter','ycenter','name')]),ggplot2::aes(x=xcenter,y=ycenter,label=name),color='white') +
     ggplot2::coord_cartesian(xlim=c(0,obj$resolution[1]), ylim = c(obj$resolution[2],0)) +
     ggplot2::scale_y_reverse() +

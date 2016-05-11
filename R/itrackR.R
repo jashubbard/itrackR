@@ -1,5 +1,5 @@
 #class constructor
-itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir(),ID_numeric.only = TRUE)
+itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir())
 {
 
   me <- list(
@@ -34,7 +34,7 @@ itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1
     me <- load_edfs(me,path=path,pattern=pattern)
 
   if(!is.null(txt))
-    me <- load_txt(me,filename=txt, ID_numeric.only)
+    me <- load_txt(me,filename=txt)
 
   return(me)
 
@@ -76,7 +76,7 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 }
 
 
-load_txt <- function(obj,type='fixations',filename,sep='\t', ID_numeric.only = TRUE){
+load_txt <- function(obj,type='fixations',filename,sep='\t'){
 
 
 if(type=='fixations')
@@ -107,14 +107,9 @@ fixdata <- dplyr::mutate(fixdata,
 else if(type=='saccades'){
 
 
-
-
 }
 
-
-if(ID_numeric.only) {
-	fixdata$ID <- as.numeric(gsub("([0-9]*).*","\\1",fixdata$ID))
-}
+fixdata$ID <- as.numeric(gsub("([0-9]*).*","\\1",fixdata$ID))
 
 obj$fixations <- dplyr::select(fixdata,ID,eyetrial,sttime,entime,gavx,gavy,fixation_key)
 
@@ -214,8 +209,8 @@ get_subdata <- function(obj,id,fields = c('header','samples'))
 }
 
 
-
-makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,angles=NULL,names=NULL,append=F){
+# coords defaults to (0, 0) so you can specify a polygon without the need to specify coords (it is not used because all coordinates are inside the poylgon data frame)
+makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius=0,xradius=0,yradius=0,angles=NULL,names=NULL,polygon=data.frame(x=c(),y=c()),append=F){
 
   if(length(shapes)==1 && nrow(coords)>1)
     shapes <- rep(shapes[1],nrow(coords))
@@ -236,39 +231,52 @@ makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,ang
     obj$rois <- list()
   }
   else if(length(obj$rois)>0 && append==T){
-   start_roi = length(obj$rois)+1
+    start_roi = length(obj$rois)+1
   }
 
+  if(is.null(names)){
+    names <- start_roi:(start_roi-1+nrow(coords))
+  }
 
-  if(is.null(names))
-    names <- start_roi:nrow(coords)
+	roipos <- start_roi
 
-  roipos <- start_roi
+	if(shapes[[1]] == 'polygon'){
+		# for a polygon only one ROI at a time is possible
+			tmpROI <- list()
 
+			tmpROI$roi = spatstat::owin(poly=polygon)
+			tmpROI$name <- names[[1]]
+			tmpROI$shape <- 'polygon'
+			tmpROI$center <- spatstat::centroid.owin(tmpROI$roi)
+			tmpROI$radius <- NA
+			tmpROI$xradius <- NA
+			tmpROI$yradius <- NA
 
- for(i in 1:nrow(coords)){
+			obj$rois[[roipos]] = tmpROI
+	} else {
 
-    tmpROI <- list()
+		for(i in 1:nrow(coords)){
 
-    if(shapes[[i]]=='circle')
-      tmpROI$roi <- spatstat::disc(radius=radius[[i]],centre=coords[i,])
-    else if(shapes[[i]]=='ellipse')
+			tmpROI <- list()
 
-      tmpROI$roi <- spatstat::ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])
+			if(shapes[[i]]=='circle'){
+				tmpROI$roi <- spatstat::disc(radius=radius[[i]],centre=coords[i,])
+			}
+			else if(shapes[[i]]=='ellipse'){
+				tmpROI$roi <- spatstat::ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])
+			}
 
+			tmpROI$name <- names[[i]]
+			tmpROI$shape <- shapes[[i]]
+			tmpROI$center <- coords[i,]
+			tmpROI$radius <- radius[[i]]
+			tmpROI$xradius <- xradius[[i]]
+			tmpROI$yradius <- yradius[[i]]
 
-    tmpROI$name <- names[[i]]
-    tmpROI$shape <- shapes[[i]]
-    tmpROI$center <- coords[i,]
-    tmpROI$radius <- radius[[i]]
-    tmpROI$xradius <- xradius[[i]]
-    tmpROI$yradius <- yradius[[i]]
-
-    obj$rois[[roipos]] <- tmpROI
-    roipos <- roipos + 1
-
- }
-
+			obj$rois[[roipos]] <- tmpROI
+			roipos <- roipos + 1
+		}
+	}
   return(obj)
 
 }
