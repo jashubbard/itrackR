@@ -50,14 +50,15 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
 }
 
 
-plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='group',difference=FALSE){
+plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='group',difference=FALSE,filter=NULL){
 
   agg <- aggregate_fixation_timeseries(obj,event=event,
                                        rois=rois,
                                        groupvars = c(lines,rows,cols),
                                        shape='long',
                                        level=level,
-                                       difference=difference)
+                                       difference=difference,
+                                       filter=NULL)
 
   mainvars <- c('bin','val','roi','epoch_start','epoch_end','binwidth')
   othervars <- names(agg)[-which(names(agg) %in% mainvars)]

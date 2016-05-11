@@ -163,6 +163,9 @@ remove_blinks <- function(obj, interpolate=FALSE)
 
     samps<- readRDS(obj$samples[[i]])
 
+    #code bad samples as "blinks"
+    samps$blink[samps$gx==1e08 | samps$gy==1e08] <- 1
+
     blinks <- as.logical(samps$blink)
     samps$pa[blinks] <-NA
     samps$gx[blinks] <-NA

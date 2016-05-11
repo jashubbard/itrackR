@@ -26,6 +26,5 @@ Depends:
     foreach,
     magrittr,
     data.table
-Suggests:
-    rmarkdown
+Suggests: rmarkdown
 VignetteBuilder: knitr

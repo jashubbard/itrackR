@@ -221,7 +221,8 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df <- merge(df,eventdata,by=c('ID','eyetrial'),all.x=T)
   df <- dplyr::arrange(df,fixation_key)
 
-
+  #convert to "trial time"
+  df[event] <- df[,event] - df$starttime
 
   #bin the data based on saccade start time and bin width (in ms)
   df$bin_start <- ceiling((df[,startvar] - df[,event])/binwidth)
@@ -230,9 +231,9 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df <- subset(df,bin_start>=firstbin & bin_end<=lastbin)
 
   #convert to "trial time"
-  df[startvar] <- df[,startvar] - df$starttime
-  df[endvar] <- df[,endvar] - df$starttime
-  df[event] <- df[,event] - df$starttime
+  # df[startvar] <- df[,startvar] - df$starttime
+  # df[endvar] <- df[,endvar] - df$starttime
+
 
   if(start<0){
     start_adj = df$bin_start + abs(firstbin)+1
@@ -287,7 +288,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
 }
 
 
-do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='long'){
+do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='long',filter=NULL){
   idvar <- 'ID'
   prefix <- 't'
 
@@ -339,7 +340,7 @@ do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='lo
 }
 
 
-aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',difference=FALSE){
+aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',difference=FALSE,filter=NULL){
 
   agg <- data.frame()
 
@@ -379,7 +380,8 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
                                             roi=r,
                                             groupvars = groupvars,
                                             shape=shape,
-                                            level=level)
+                                            level=level,
+                                            filter = filter)
 
     agg <- rbind(agg,aggtmp)
   }
