@@ -1,6 +1,6 @@
 ##itrackR
 
-itrackR is an R package for high-level analyses of eyetracking data. For now it is only compatible with EDF files from SR-Research Eyelink eyetrackers. **This is currently a work-in-progress.** Functions are missing documentation, but you can see an example of a full analysis with `vignettes('itrackR')`. Below is a snippet of that document. You will first need to install SR Research's API, found here: (https://www.sr-support.com/forumdisplay.php?17-EyeLink-Display-Software) and the [edfR](http://github.com/jashubbard/edfR) package in order to import the edf files. These aren't on CRAN yet, so everything should be installed via [devtools](https://cran.r-project.org/web/packages/devtools/index.html):
+itrackR is an R package for high-level analyses of eyetracking data. For now it is only compatible with EDF files from SR-Research Eyelink eyetrackers. **This is currently a work-in-progress.** Functions are missing documentation, but you can see an example of a full analysis with `vignette('itrackR')`. Below is a snippet of that document. You will first need to install SR Research's API, found here: (https://www.sr-support.com/forumdisplay.php?17-EyeLink-Display-Software) and the [edfR](http://github.com/jashubbard/edfR) package in order to import the edf files. These aren't on CRAN yet, so everything should be installed via [devtools](https://cran.r-project.org/web/packages/devtools/index.html):
 
 ```r
 install.packages('devtools')
@@ -8,7 +8,7 @@ devtools::install_github('jashubbard/edfR')
 devtools::install_github('jashubbard/itrackR')
 ```
 
-edfR is Mac and Linux only for now, but Windows support should be coming soon. 
+edfR is Mac and Linux only for now, but Windows support should be coming soon.
 
 ##Example Data
 
@@ -35,7 +35,7 @@ z <- itrackr(edfs=edfs)
 
 ## Object Structure
 
-The `itrackR` object consists of fields for each relevant event. Each one is a data frame. The `ID` fields specifies each subject. The subject ID is formed from extracting only the numeric data from the EDF file. 
+The `itrackR` object consists of fields for each relevant event. Each one is a data frame. The `ID` fields specifies each subject. The subject ID is formed from extracting only the numeric data from the EDF file.
 
 `z$fixations`
 
@@ -85,7 +85,7 @@ The `itrackR` object consists of fields for each relevant event. Each one is a d
 
 ## ROIs
 
-Much of the analysis depends on specifying regions of interest (ROIs). We can then determine if fixations lie within these ROIs. First we specify all possible ROIs that may occur in an experiment. The function `radialCoords` makes it easy to specify a set of evenly-spaced coordinates arranged in a ring. We will create elliptical ROIs in this example. `roiFlower` makes it easy to rotate the ellipses to make a flower-like pattern. 
+Much of the analysis depends on specifying regions of interest (ROIs). We can then determine if fixations lie within these ROIs. First we specify all possible ROIs that may occur in an experiment. The function `radialCoords` makes it easy to specify a set of evenly-spaced coordinates arranged in a ring. We will create elliptical ROIs in this example. `roiFlower` makes it easy to rotate the ellipses to make a flower-like pattern.
 
 
 ```r
@@ -114,7 +114,7 @@ Now we add the outer ROIs. We make sure and specify the `append` option, and als
 z <- makeROIs(z,outercoords,shape='ellipse',xradius=60, yradius=120, angles=angles[c(2,4,6,8,10,12)], names=7:12, append=T)
 ```
 
-Finally let's include a central, circular ROI. 
+Finally let's include a central, circular ROI.
 
 
 ```r
@@ -129,7 +129,7 @@ plot.rois(z)
 
 ## Plotting
 
-Once the ROIs are added, we can easily make scatterplots of fixations for each subject. This allows us to find calibration issues. 
+Once the ROIs are added, we can easily make scatterplots of fixations for each subject. This allows us to find calibration issues.
 
 
 ```r
@@ -144,9 +144,9 @@ Ideally, we send a message to Eyelink on every trial in order to identify it in 
 
 Next we specify index variables that uniquely identify trials. This should be present in both the edf and behavioral file. `set_index` searches through the messages, finds the relevant ones, and extracts the numeric data. `set_index` can take a regular expression to find anything that matches this pattern, and `numeric.only` tells it to ignore any text (e.g., "BLOCK "). The variable names are stored in `z$indexvars` and the information is added to `z$header`.
 
-`find_messages` is for pulling other message information from the EDF file. Here we want to have the timestamps of the stimulus onset and the response so we can refer to them later. 
+`find_messages` is for pulling other message information from the EDF file. Here we want to have the timestamps of the stimulus onset and the response so we can refer to them later.
 
-`add_behdata` merges the behavioral file with the eye data, based on the index variables. This only works if we run `set_index` first (so we have `Block` and `Trial` variables in the behavioral data frame, and in our itrackR object).  
+`add_behdata` merges the behavioral file with the eye data, based on the index variables. This only works if we run `set_index` first (so we have `Block` and `Trial` variables in the behavioral data frame, and in our itrackR object).
 
 
 ```r
@@ -189,7 +189,7 @@ z <- calcHits(z)
 ```
 
 
-This is not terribly useful if your task-relevant ROI changes positions on each trial. You can use `mapROIs` map your experiment-wide ROIs (1,2,3...13) to trial-specific ROIs ('target','distractor'). You just need a variable in your behavioral data that specifies the number of the relevant ROI. Here, `Targetpos` specifies the target location, and `Distractorpos` specifies the distractor location: 
+This is not terribly useful if your task-relevant ROI changes positions on each trial. You can use `mapROIs` map your experiment-wide ROIs (1,2,3...13) to trial-specific ROIs ('target','distractor'). You just need a variable in your behavioral data that specifies the number of the relevant ROI. Here, `Targetpos` specifies the target location, and `Distractorpos` specifies the distractor location:
 
 
 ```r
@@ -199,7 +199,7 @@ z <- mapROIs(z,names=c('target','distractor'),indicators=c('Targetpos','Distract
 
 ##Saving data
 
-Next we probably want to do statistics on our eyetracking data. We want to have our behavioral data merged with the eye data, including our ROI "hits". Just use `eyemerge` to pull out the relevant information. Any eyetracking data that does not match behavioral data will still be included (all behavioral variables will just be `NA`).  
+Next we probably want to do statistics on our eyetracking data. We want to have our behavioral data merged with the eye data, including our ROI "hits". Just use `eyemerge` to pull out the relevant information. Any eyetracking data that does not match behavioral data will still be included (all behavioral variables will just be `NA`).
 
 
 ```r

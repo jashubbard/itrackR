@@ -5,11 +5,10 @@
 
 plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',names=FALSE,IDs=c()){
 
-  
   if (length(IDs) != 0) {
     obj$fixations = subset(obj$fixations, ID %in% IDs)
   }
-  
+
   if(rois && !is.null(obj$rois)){
     df <- rois2df(obj)
 
@@ -180,8 +179,8 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 
   if(crosshairs){
     p <- p +
-      ggplot2::geom_hline(yintercept=384,color='red',size=0.3,linetype='dashed') +
-      ggplot2::geom_vline(xintercept=512,color='red',size=0.3,linetype='dashed')
+      ggplot2::geom_hline(yintercept=obj$resolution[2]/2,color='red',size=0.3,linetype='dashed') +
+      ggplot2::geom_vline(xintercept=obj$resolution[1]/2,color='red',size=0.3,linetype='dashed')
   }
 
   p

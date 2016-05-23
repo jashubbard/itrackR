@@ -28,7 +28,6 @@ roiFlower <- function(numrois,starting_angle=0,direction='counterclockwise'){
     angles <- rev(angles)
 
   return(angles)
-
 }
 
 
@@ -38,9 +37,6 @@ calcHits <- function(obj,rois='all',append=FALSE){
   obj <- calcHits_saccades(obj,rois,append)
 
   return(obj)
-
-
-
 }
 
 
@@ -50,21 +46,17 @@ calcHits_fixations <- function(obj,rois='all',append=FALSE){
   allrois <- lapply(obj$rois,function(x) x$roi)
   allnames <- unlist(lapply(obj$rois, function(x) x$name))
 
-
-  if(is.numeric(allnames))
-    allnames <- paste0('roi_',allnames)
+  allnames <- paste0('roi_',allnames)
 
   hits <- data.frame(fixation_key = obj$fixations$fixation_key)
+
   names(hits)[-1] <- allnames
 
   for(i in 1:length(allrois)){
-
-
    hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$fixations$gavx,obj$fixations$gavy,allrois[[i]]))
-
   }
 
-  hits <- hits[,c('fixation_key',paste0('roi_',1:length(obj$rois)))]
+  hits <- hits[,c('fixation_key',allnames)]
 
   if(!append)
     tmp <- obj$fixations[c('fixation_key','ID','eyetrial','sttime','entime','gavx','gavy')]
@@ -74,7 +66,6 @@ calcHits_fixations <- function(obj,rois='all',append=FALSE){
   obj$fixations <- cbind(tmp,dplyr::select(hits,-fixation_key))
 
   return(obj)
-
 }
 
 
@@ -83,10 +74,7 @@ calcHits_saccades <- function(obj,rois='all',append=FALSE){
   allrois <- lapply(obj$rois,function(x) x$roi)
   allnames <- unlist(lapply(obj$rois, function(x) x$name))
 
-
-
-  if(is.numeric(allnames))
-    allnames <- c(paste0('roi_start_',allnames), paste0('roi_end_',allnames))
+  allnames <- c(paste0('roi_start_',allnames), paste0('roi_end_',allnames))
 
   hits <- data.frame(saccade_key = obj$saccades$saccade_key)
   names(hits)[-1] <- allnames
@@ -101,7 +89,7 @@ calcHits_saccades <- function(obj,rois='all',append=FALSE){
 
   }
 
-  hits <- hits[,c('saccade_key',paste0('roi_start_',1:length(obj$rois)),paste0('roi_end_',1:length(obj$rois)))]
+  hits <- hits[,c('saccade_key',allnames)]
 
   if(!append)
     tmp <- obj$saccades[c('saccade_key','ID','eyetrial','sttime','entime','gstx','gsty','genx','geny')]
@@ -111,25 +99,26 @@ calcHits_saccades <- function(obj,rois='all',append=FALSE){
   obj$saccades <- cbind(tmp,dplyr::select(hits,-saccade_key))
 
   return(obj)
-
 }
-
 
 mapROIs <- function(obj,names,indicators=NULL){
 
   newnames <- names
   startnames <- newnames
 
+  roinames <- unlist(lapply(obj$rois, function(x) x$name))
+
   for(eyedata in c('fixations','saccades')){
 
     if(eyedata=='fixations'){
       keyvar='fixation_key'
-      roivars = paste0('roi_',1:length(obj$rois))
+      roivars <- paste0('roi_',roinames)
       newnames <- paste0(startnames,'_hit')
     }
     else if(eyedata=='saccades'){
       keyvar='saccade_key'
-      roivars = c(paste0('roi_start_',1:length(obj$rois)),paste0('roi_end_',1:length(obj$rois)))
+      roivars = c(paste0('roi_start_',roinames))
+      roivars = c(roivars, paste0('roi_end_',roinames))
       newnames <- c(paste0(startnames,'_start_hit'),paste0(startnames,'_end_hit'))
     }
 
@@ -137,8 +126,8 @@ mapROIs <- function(obj,names,indicators=NULL){
     if(any(names(obj[[eyedata]]) %in% newnames))
       obj[[eyedata]] <- obj[[eyedata]][ , -which(names(obj[[eyedata]]) %in% newnames)]
 
-
     tmp1 <- obj$beh[,c('ID','eyetrial',indicators)] #behavioral data with trial-by-trial indicators
+    #tmp1[,indicators] <- as.numeric(tmp1[, indicators]) # if indicators are factors convert them here to numbers
     tmp2 <- obj[[eyedata]][,c('ID','eyetrial',keyvar,roivars)] #fixation data with roi hits
     tmp3 <- merge(tmp1,tmp2,by=c('ID','eyetrial'),all.y=T) #merge them together so we have our indicators for fixation-by-fixation
     tmp3 <- dplyr::arrange_(tmp3,keyvar) #put in the original order
@@ -146,12 +135,18 @@ mapROIs <- function(obj,names,indicators=NULL){
 
     #funny hack to handle situations where indicator is NA.
     #Create a column at the end that is all NAs, so when indexed it fills in that value
-    hits$missing <- NA
+    hits$missing <- "NA"
     hits <- as.matrix(hits)
 
-
-
     for(i in 1:length(indicators)){
+
+      # if indicators are factors (i.e., if ROIs have non-numeric names)
+      # map indicator names to corresponding column number
+      factorIndicators = c()
+      if(is.factor(tmp3[,indicators[i]])){
+        factorIndicators = tmp3[,indicators[i]]
+        tmp3[,indicators[i]] = as.numeric(match(tmp3[,indicators[i]], roinames))
+      }
 
       tmp3[newnames[i]] <- NA
 
@@ -159,22 +154,26 @@ mapROIs <- function(obj,names,indicators=NULL){
       tmp3[,indicators[i]][is.na(tmp3[,indicators[i]])] <- ncol(hits)
 
       idx <- sub2ind(hits,1:nrow(tmp3),tmp3[,indicators[i]]) #get the single number indices based on row and column numbers (Indicator corresponds to column number)
-      tmp3[newnames[i]] <- hits[idx] #grab the actual data based on the single number indices. Yields a single column of hits and misses
+      #TODO: prints warning when "NA" is converted to NA
+      tmp3[newnames[i]] <- as.numeric(hits[idx]) #grab the actual data based on the single number indices. Yields a single column of hits and misses
 
       if(eyedata=='saccades'){
         idx2 <- sub2ind(hits,1:nrow(tmp3),tmp3[,indicators[i]]+length(obj$rois)) #get the single number indices based on row and column numbers (Indicator corresponds to column number)
-        tmp3[newnames[i+length(startnames)]] <- hits[idx2] #grab the actual data based on the single number indices. Yields a single column of hits and misses
-
+        tmp3[newnames[i+length(startnames)]] <- as.numeric(hits[idx2]) #grab the actual data based on the single number indices. Yields a single column of hits and misses
       }
 
       tmp3[,indicators[i]][tmp3[,indicators[i]]==ncol(hits)] <- NA #fill the missing data back with NAs
     }
 
+    #restore the factor indicators that were previously replaced with numbers (if appropriate)
+    if(length(factorIndicators) != 0){
+      tmp3[,indicators[i]] = factorIndicators
+    }
+
     #in case we're re-running this, don't create duplicate columns
-    if(any(names(obj[[eyedata]]) %in% indicators))
+    if(any(names(obj[[eyedata]]) %in% indicators)){
       obj[[eyedata]] <- obj[[eyedata]][ , -which(names(obj[[eyedata]]) %in% indicators)]
-
-
+    }
 
     #merge our existing fixation data with our new mapped data
     obj[[eyedata]] <- merge(obj[[eyedata]],tmp3[,c(keyvar,indicators,newnames)],by=keyvar,all.x=T)
@@ -183,7 +182,7 @@ mapROIs <- function(obj,names,indicators=NULL){
 
 }
 
-sub2ind <- function(mat, r,c){
+sub2ind <- function(mat, r, c){
 
   m <- nrow(mat)
   ind <- (c-1)*m + r
@@ -196,7 +195,6 @@ ind2sub <- function(mat,ind){
   r = ((ind-1) %% m) + 1
   c = floor((ind-1) / m) + 1
   return(list(row=r,col=c))
-
 }
 
 epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET'){
@@ -204,11 +202,10 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   startvar <- 'sttime'
   endvar <- 'entime'
 
-  if(is.numeric(roi))
-    hitvar <- paste0('roi_',roi)
-  else
+#~   if(is.numeric(roi))
+#~     hitvar <- paste0('roi_',roi)
+#~   else
     hitvar <- paste0(roi,'_hit')
-
 
   prefix = 't'
   firstbin <- (ceiling(start/binwidth))
@@ -223,26 +220,28 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
 
   #convert to "trial time"
   df[event] <- df[,event] - df$starttime
+  df[startvar] <- df[,startvar] - df$starttime
+  df[endvar] <- df[,endvar] - df$starttime
 
   #bin the data based on saccade start time and bin width (in ms)
   df$bin_start <- ceiling((df[,startvar] - df[,event])/binwidth)
   df$bin_end <- ceiling((df[,endvar] - df[,event])/binwidth)
+
   #throw out saccades before stim onset and after numbins
   df <- subset(df,bin_start>=firstbin & bin_end<=lastbin)
 
   #convert to "trial time"
-  # df[startvar] <- df[,startvar] - df$starttime
-  # df[endvar] <- df[,endvar] - df$starttime
-
+#~   df[startvar] <- df[,startvar] - df$starttime
+#~   df[endvar] <- df[,endvar] - df$starttime
 
   if(start<0){
     start_adj = df$bin_start + abs(firstbin)+1
     end_adj = df$bin_end + abs(firstbin)+1
-    intervals<- apply(cbind(start_adj,end_adj),1,function(x) x[1]:x[2])
+    intervals <- apply(cbind(start_adj,end_adj),1,function(x) x[1]:x[2])
   }
   else {
-  #create intervals (start_bin:end_bin)
-  intervals<- apply(df[c('bin_start','bin_end')],1,function(x) x[1]:x[2])
+    #create intervals (start_bin:end_bin)
+    intervals <- apply(df[c('bin_start','bin_end')],1,function(x) x[1]:x[2])
   }
 
   #create a vector for each saccade (numbins wide). Fill with NA, then put 1's wherever saccade occurred (start_bin:end_bin)
@@ -254,8 +253,10 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
 
   #this creates a list
   vectors <- lapply(intervals,f2)
+
   #stack into a matrix
   vectors <- do.call(rbind,vectors)
+
   #now, multiply each column by our vector indicating whether that saccade "hit" our item of interest
   #(will produce 0's where saccade occurred, but missed, 1 where it occured and missed, and NA where it didn't occur)
   vectors <- sweep(vectors,MARGIN=1,df[,hitvar],'*')
@@ -263,7 +264,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   #save the result in our data frame
   vars = gsub('-','_',paste0(prefix,firstbin:lastbin))
   df[vars] <- vectors
-
+print(head(df, n=20))
   #merge with our behavioral data
   df$roi <- roi
   df$epoch_start <- start
@@ -274,13 +275,11 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   df <- merge(obj$beh[c('ID','eyetrial',obj$indexvars)],df,by=c('ID','eyetrial'),all.y=T)
   df <- dplyr::arrange(df,fixation_key)
 
-
   if(is.null(obj$epochs$fixations))
     obj$epochs$fixations <- list()
 
   if(is.null(obj$epochs$fixations[[event]]))
     obj$epochs$fixations[[event]] <- list()
-
 
   obj$epochs$fixations[[event]][[roi]] <- df
 
@@ -442,7 +441,6 @@ change.sampledir <- function(obj,dir){
   }
 
   return(obj)
-
 }
 
 
