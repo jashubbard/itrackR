@@ -19,14 +19,14 @@ Imports:
     dplyr,
     tidyr,
     spatstat,
-    pracma,
-    R.utils
+    knitr,
+    R.utils,
+    pracma
 Depends:
     foreach,
     magrittr,
     data.table
 Suggests:
-    knitr,
     rmarkdown
 VignetteBuilder: knitr
 RoxygenNote: 5.0.1
