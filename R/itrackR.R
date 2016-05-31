@@ -292,19 +292,16 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     if(is.null(event) || is.null(roi))
       stop('You must provide the name of the time-locking event and the ROI')
 
-
     eyes <- obj$epochs$fixations[[event]][[roi]]
     beh <- obj$beh
 
-
-
     realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars))
 
-    if(behdata[1] !='all')
+    if(behdata[1] !='all'){
       beh_to_keep <- intersect(behdata,realbehvars)
+    }
     else
       beh_to_keep <- intersect(colnames(beh),realbehvars)
-
 
       timevars <- names(eyes)[grepl('^t[1-9]',names(eyes))]
 
@@ -313,56 +310,46 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
 
       # eye_to_keep <- c('ID','eyetrial',obj$indexvars,beh_to_keep,'roi','epoch_start','epoch_end','binwidth','sttime','entime',paste0(roi,'_hit'),timevars)
       #eyes <- eyes[eye_to_keep]
-
   }
-else{
+  else{
 
-  #regular fixations or saccades
-  eyes <- obj[[eyedata]]
-  beh <- obj$beh
+    #regular fixations or saccades
+    eyes <- obj[[eyedata]]
+    beh <- obj$beh
 
-  #add trial header information
-  beh <- dplyr::left_join(beh,obj$header[c('ID','eyetrial','starttime')], by=c('ID','eyetrial'))
+    #add trial header information
+    beh <- dplyr::left_join(beh,obj$header[c('ID','eyetrial','starttime')], by=c('ID','eyetrial'))
 
 
-  #remove the roi_1, roi_2, ... columns
-  if(!all.rois && any(grepl('^roi_*',colnames(eyes)))){
-    eyes <- dplyr::select(eyes,-matches("^roi_*"))
+    #remove the roi_1, roi_2, ... columns
+    if(!all.rois && any(grepl('^roi_*',colnames(eyes)))){
+      eyes <- dplyr::select(eyes,-matches("^roi_*"))
+    }
+
+    #if we want only some of the behavioral variables
+    if(behdata[1] !='all')
+      beh <- dplyr::select_(beh,.dots=unique(c('ID','eyetrial','starttime',obj$indexvars,behdata)))
+
+    #in case there are variable names in common between eyedata and behdata, besides index variables
+    #remove them from eyedata
+    realvars <- setdiff(colnames(eyes),c('ID','eyetrial','starttime',obj$indexvars))
+    commonvars <- intersect(realvars,colnames(beh))
+
+    if(length(commonvars)>0)
+      eyes <- eyes[!(colnames(eyes) %in% commonvars)]
+
+    #merge behavioral and eye data
+    output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
+    output <- dplyr::arrange(output,ID,eyetrial)
+
+    output <- dplyr::rename(output,
+                           trialsttime = starttime)
+
+    output$sttime <- output$sttime - output$trialsttime
+    output$entime <- output$entime - output$trialsttime
   }
-
-  #if we want only some of the behavioral variables
-  if(behdata[1] !='all')
-    beh <- dplyr::select_(beh,.dots=unique(c('ID','eyetrial','starttime',obj$indexvars,behdata)))
-
-  #in case there are variable names in common between eyedata and behdata, besides index variables
-  #remove them from eyedata
-  realvars <- setdiff(colnames(eyes),c('ID','eyetrial','starttime',obj$indexvars))
-  commonvars <- intersect(realvars,colnames(beh))
-
-  if(length(commonvars)>0)
-    eyes <- eyes[!(colnames(eyes) %in% commonvars)]
-
-  #merge behavioral and eye data
-  output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
-  output <- dplyr::arrange(output,ID,eyetrial)
-
-  output <- dplyr::rename(output,
-                         trialsttime = starttime)
-
-  output$sttime <- output$sttime - output$trialsttime
-  output$entime <- output$entime - output$trialsttime
-
-}
-
-
-
 
   return(output)
-
-
-
-
-
 }
 
 

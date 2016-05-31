@@ -30,7 +30,6 @@ roiFlower <- function(numrois,starting_angle=0,direction='counterclockwise'){
   return(angles)
 }
 
-
 calcHits <- function(obj,rois='all',append=FALSE){
 
   obj <- calcHits_fixations(obj,rois,append)
@@ -38,8 +37,6 @@ calcHits <- function(obj,rois='all',append=FALSE){
 
   return(obj)
 }
-
-
 
 calcHits_fixations <- function(obj,rois='all',append=FALSE){
 
@@ -84,9 +81,7 @@ calcHits_saccades <- function(obj,rois='all',append=FALSE){
   }
 
   for(i in (length(allrois)+1):(length(allrois)*2)){
-
     hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$saccades$genx,obj$saccades$geny,allrois[[i-length(allrois)]]))
-
   }
 
   hits <- hits[,c('saccade_key',allnames)]
@@ -135,26 +130,26 @@ mapROIs <- function(obj,names,indicators=NULL){
 
     #funny hack to handle situations where indicator is NA.
     #Create a column at the end that is all NAs, so when indexed it fills in that value
-    hits$missing <- "NA"
+    hits$missing <- NA
     hits <- as.matrix(hits)
 
     for(i in 1:length(indicators)){
 
-      # if indicators are factors (i.e., if ROIs have non-numeric names)
+      # if indicators are factors / strings (i.e., if ROIs have non-numeric names)
       # map indicator names to corresponding column number
+
       factorIndicators = c()
-      if(is.factor(tmp3[,indicators[i]])){
+      if(!is.numeric(tmp3[,indicators[i]])){
         factorIndicators = tmp3[,indicators[i]]
         tmp3[,indicators[i]] = as.numeric(match(tmp3[,indicators[i]], roinames))
       }
 
-      tmp3[newnames[i]] <- NA
-
       #wherever indicator is NA, change to #rois+1, so it indexes the "missing" column created above
       tmp3[,indicators[i]][is.na(tmp3[,indicators[i]])] <- ncol(hits)
 
+      tmp3[newnames[i]] <- NA
+
       idx <- sub2ind(hits,1:nrow(tmp3),tmp3[,indicators[i]]) #get the single number indices based on row and column numbers (Indicator corresponds to column number)
-      #TODO: prints warning when "NA" is converted to NA
       tmp3[newnames[i]] <- as.numeric(hits[idx]) #grab the actual data based on the single number indices. Yields a single column of hits and misses
 
       if(eyedata=='saccades'){
@@ -177,6 +172,11 @@ mapROIs <- function(obj,names,indicators=NULL){
 
     #merge our existing fixation data with our new mapped data
     obj[[eyedata]] <- merge(obj[[eyedata]],tmp3[,c(keyvar,indicators,newnames)],by=keyvar,all.x=T)
+
+    # delete the hit columns to free memory
+    obj[[eyedata]][, c(roivars)] <- list(NULL)
+    # trigger garbage collection:
+    gc()
   }
   return(obj)
 
@@ -197,7 +197,7 @@ ind2sub <- function(mat,ind){
   return(list(row=r,col=c))
 }
 
-epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET'){
+epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL){
 
   startvar <- 'sttime'
   endvar <- 'entime'
@@ -211,6 +211,11 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   firstbin <- (ceiling(start/binwidth))
   numbins = ((end - start)/binwidth)+1
   lastbin <- firstbin + numbins-1
+
+  if(is.null(event)){
+    obj$header$default_event = obj$header$starttime
+    event = 'default_event'
+  }
 
   eventdata <- obj$header[,c('ID','eyetrial','starttime',event)]
 
@@ -264,7 +269,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='STIMONSET
   #save the result in our data frame
   vars = gsub('-','_',paste0(prefix,firstbin:lastbin))
   df[vars] <- vectors
-print(head(df, n=20))
+
   #merge with our behavioral data
   df$roi <- roi
   df$epoch_start <- start
@@ -306,14 +311,12 @@ do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='lo
   #aggregate by trial(max)
   #this is super weird, just to make things play nice with dplyr
   varnames = sapply(c(idvar,obj$indexvars,groupvars,'bin'), . %>% {as.formula(paste0('~', .))})
-
   df <- dplyr::group_by_(df,.dots=varnames) %>%
     dplyr::summarise(val = max(val,na.rm=T))
 
   if(level!='trial'){
     #aggregate by subject (mean)
     varnames2 = sapply(c(idvar,groupvars,'bin'), . %>% {as.formula(paste0('~', .))})
-
     df <- dplyr::group_by_(dplyr::ungroup(df),.dots=varnames2) %>%
       dplyr::summarise(val=mean(val,na.rm=T))
   }
@@ -343,76 +346,63 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
 
   agg <- data.frame()
 
-  if(difference && length(rois==2)){
-    aggID_one <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[1],groupvars = c('Task','Conflict'),shape='long',level='ID')
-    aggID_two <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[2],groupvars = c('Task','Conflict'),shape='long',level='ID')
+  if((difference || logRatio) && length(rois==2)){
 
-    aggID <- merge(aggID_one,aggID_two,by=c('ID','Task','Conflict','bin'))
+    if(difference & logRatio){
+      stop("You can't plot difference and log ratio at the same time")
+    }
+
+    aggID_one <- aggregate_fixation_timeseries(obj,event=event,roi=rois[1],groupvars = groupvars,shape='long',level='ID')
+    aggID_two <- aggregate_fixation_timeseries(obj,event=event,roi=rois[2],groupvars = groupvars,shape='long',level='ID')
+
+    aggID <- merge(aggID_one,aggID_two,by=c('ID',groupvars,'bin'))
 
     if( ( (!all(aggID$binwidth.x==aggID$binwidth.y)) || (!all(aggID$epoch_start.x==aggID$epoch_start.y)) || (!all(aggID$epoch_end.x==aggID$epoch_end.y)) ))
       stop('Epochs/binning is different for the different ROIs. Data will not match up')
 
-    aggID$val <- aggID$val.x - aggID$val.y
+    if(difference){
+      aggID$val <- aggID$val.x - aggID$val.y
+    } else if (logRatio){
+      aggID$val <- log((aggID$val.x+1.0) / (aggID$val.y+1.0))
+    } else {
+      print ("Error. Neither difference nor logRatio are true. You should not see this message.")
+    }
 
     aggID <- dplyr::rename(aggID,
                            epoch_start = epoch_start.x,
                            epoch_end = epoch_end.x,
                            binwidth = binwidth.x)
 
-    aggID <- dplyr::select(aggID,ID,Task,Conflict,bin,val,epoch_start,epoch_end,binwidth)
-
+    #one_of to use character vectors here (unfortunately not possible with group_by)
+    aggID <- dplyr::select(aggID,ID,one_of(groupvars),bin,val,epoch_start,epoch_end,binwidth)
 
     if(level=='group'){
-      agg <- dplyr::group_by(aggID,bin,Task,Conflict,epoch_start,epoch_end,binwidth) %>%
+      #apparently dplyr does not like character vectors (groupvars) and 'static' column names. this is the workaround:
+      tmpvars = sapply(c('bin','epoch_start','epoch_end','binwidth',groupvars), . %>% {as.formula(paste0('~', .))})
+      agg <- dplyr::group_by_(aggID,.dots=tmpvars) %>%
         dplyr::summarise(val = mean(val,na.rm=T))
     }
     else
       agg <- aggID
-
-    agg$roi <- 'difference'
-
-  } else if(logRatio && length(rois==2)){
-    aggID_one <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[1],groupvars = c('Task','Conflict'),shape='long',level='ID')
-    aggID_two <- aggregate_fixation_timeseries(obj,event='STIMONSET',roi=rois[2],groupvars = c('Task','Conflict'),shape='long',level='ID')
-
-    aggID <- merge(aggID_one,aggID_two,by=c('ID','Task','Conflict','bin'))
-
-    if( ( (!all(aggID$binwidth.x==aggID$binwidth.y)) || (!all(aggID$epoch_start.x==aggID$epoch_start.y)) || (!all(aggID$epoch_end.x==aggID$epoch_end.y)) ))
-      stop('Epochs/binning is different for the different ROIs. Data will not match up')
-
-    aggID$val <- log(aggID$val.x / aggID$val.y)
-
-    aggID <- dplyr::rename(aggID,
-                           epoch_start = epoch_start.x,
-                           epoch_end = epoch_end.x,
-                           binwidth = binwidth.x)
-
-    aggID <- dplyr::select(aggID,ID,Task,Conflict,bin,val,epoch_start,epoch_end,binwidth)
-
-
-    if(level=='group'){
-      agg <- dplyr::group_by(aggID,bin,Task,Conflict,epoch_start,epoch_end,binwidth) %>%
-        dplyr::summarise(val = mean(val,na.rm=T))
-    }
-    else
-      agg <- aggID
-
-    agg$roi <- 'difference'
-
   }
+
+    if(difference){
+      agg$roi <- 'difference'
+    } else if(logRatio){
+      agg$roi <- 'log ratio'
+    }
+
   else{
+    for(r in rois){
+      aggtmp <- do_agg_fixations(obj,event=event,
+                                              roi=r,
+                                              groupvars = groupvars,
+                                              shape=shape,
+                                              level=level,
+                                              filter = filter)
 
-  for(r in rois){
-    aggtmp <- do_agg_fixations(obj,event=event,
-                                            roi=r,
-                                            groupvars = groupvars,
-                                            shape=shape,
-                                            level=level,
-                                            filter = filter)
-
-    agg <- rbind(agg,aggtmp)
-  }
-
+      agg <- rbind(agg,aggtmp)
+    }
   }
 
   return(agg)
@@ -442,8 +432,6 @@ change.sampledir <- function(obj,dir){
 
   return(obj)
 }
-
-
 
 # Implementation of the Engbert & Kliegl algorithm for the
 # detection of saccades.  This function takes a data frame of the

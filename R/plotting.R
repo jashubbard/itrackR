@@ -53,7 +53,11 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
 }
 
 
-plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='group',difference=FALSE,logRatio=FALSE,filter=NULL){
+plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level='group',difference=FALSE,logRatio=FALSE,filter=NULL){
+
+  if(is.null(event)){
+    event = 'default_event'
+  }
 
   agg <- aggregate_fixation_timeseries(obj,event=event,
                                        rois=rois,
@@ -83,7 +87,6 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
     colexp <- do.call('paste',c(as.list(cols),sep=' + '))
   }
 
-
   plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=lines,color=lines))+
     ggplot2::geom_line(size=.75) +
     ggplot2::geom_point(size=3) + ggplot2::xlab('time (ms)') + ggplot2::ylab('probability of fixation (%)') +
@@ -91,7 +94,9 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
     ggplot2::scale_color_discrete(name = toString(lines)) +
     ggplot2::scale_x_continuous(breaks = seq(min(tmp$bin),max(tmp$bin),100))
 
-
+  if(difference || logRatio){
+    plt <- plt + ggplot2::geom_hline(yintercept=0)
+  }
 
   if (!is.null(rows) | !is.null(cols)){
 
@@ -106,8 +111,6 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
     plt <- plt + ggplot2::facet_grid(facetexp)
   }
 
-
-
   plt <- plt + ggplot2::theme(panel.background = ggplot2::element_blank(),
                               panel.border = ggplot2::element_blank(),
                               axis.line.x = ggplot2::element_line(color="black", size = .5),
@@ -119,9 +122,6 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
                               panel.grid.major = ggplot2::element_blank(),
                               panel.grid.minor = ggplot2::element_blank())
 
-
-
-
     output = list()
     output$plt <- plt
     output$data <- tmp
@@ -129,8 +129,6 @@ plot.timeseries <- function(obj,event,rois,lines,rows=NULL,cols=NULL,level='grou
     plt
 
   return(output)
-
-
 }
 
 plot_random_epochs <- function(epochs,n=100)
@@ -316,6 +314,5 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
     plt
 
     return(plt)
-
 }
 
