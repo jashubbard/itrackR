@@ -65,7 +65,6 @@ calcHits_fixations <- function(obj,rois='all',append=FALSE){
   return(obj)
 }
 
-
 calcHits_saccades <- function(obj,rois='all',append=FALSE){
 
   allrois <- lapply(obj$rois,function(x) x$roi)
@@ -189,7 +188,6 @@ sub2ind <- function(mat, r, c){
   return(ind)
 }
 
-
 ind2sub <- function(mat,ind){
   m <- nrow(mat)
   r = ((ind-1) %% m) + 1
@@ -288,39 +286,49 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL){
 
   obj$epochs$fixations[[event]][[roi]] <- df
 
+  # force garbage collection:
+  gc()
+
   return(obj)
 }
-
 
 do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='long',filter=NULL){
   idvar <- 'ID'
   prefix <- 't'
 
-  #reshape the data (turn our bins into rows)
   # df <- obj$epochs$fixations[[event]][[roi]]
 
   df <- eyemerge(obj,'epoched_fixations',behdata=groupvars,event=event,roi=roi)
+
+  # remove unneccesary columns to save memory
+  df <- dplyr::select(df, c(-fixation_key, -sttime, -entime, -bin_start, -bin_end)) #, -epoch_start, -epoch_end, -binwidth))
+
+  #remove specified filters: filter[1] == column name, filter[2] == condition (e.g., preposition == 'above')
+  if(!is.null(filter)){
+    df <-df[eval(parse(text=paste0("df$",filter[1]))) == filter[2], ]
+  }
 
   epoch_start <- df$epoch_start[1]
   epoch_end <- df$epoch_end[1]
   binwidth <- df$binwidth[1]
 
   binnames <- names(df)[grepl(paste0('^',prefix,'[_0-9]'),names(df))]
-  df <- tidyr::gather_(df,'bin','val',binnames)
+  #reshape the data (turn our bins into rows)
+  # na.rm saves memory
+  df <- tidyr::gather_(df,'bin','val',binnames, na.rm = TRUE)
 
-  #aggregate by trial(max)
+ #aggregate by trial(max)
   #this is super weird, just to make things play nice with dplyr
   varnames = sapply(c(idvar,obj$indexvars,groupvars,'bin'), . %>% {as.formula(paste0('~', .))})
   df <- dplyr::group_by_(df,.dots=varnames) %>%
     dplyr::summarise(val = max(val,na.rm=T))
 
-  if(level!='trial'){
+ if(level!='trial'){
     #aggregate by subject (mean)
     varnames2 = sapply(c(idvar,groupvars,'bin'), . %>% {as.formula(paste0('~', .))})
     df <- dplyr::group_by_(dplyr::ungroup(df),.dots=varnames2) %>%
       dplyr::summarise(val=mean(val,na.rm=T))
   }
-
   if(level=='group'){
     #aggregate across subjects
     varnames3 = sapply(c(groupvars,'bin'), . %>% {as.formula(paste0('~', .))})
@@ -341,57 +349,55 @@ do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='lo
   return(df)
 }
 
-
-aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',difference=FALSE,logRatio=FALSE,filter=NULL){
+aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',type='probability',filter=NULL){
 
   agg <- data.frame()
 
-  if((difference || logRatio) && length(rois==2)){
+  if((type != 'probability') && length(rois==2)){
 
-    if(difference & logRatio){
-      stop("You can't plot difference and log ratio at the same time")
+    if(any(groupvars == 'roi')){
+      stop('Using "roi" as a grouping variable does not work if you want to plot a contrast score.')
     }
 
     aggID_one <- aggregate_fixation_timeseries(obj,event=event,roi=rois[1],groupvars = groupvars,shape='long',level='ID')
     aggID_two <- aggregate_fixation_timeseries(obj,event=event,roi=rois[2],groupvars = groupvars,shape='long',level='ID')
 
-    aggID <- merge(aggID_one,aggID_two,by=c('ID',groupvars,'bin'))
+    # force garbage collection:
+    gc()
 
-    if( ( (!all(aggID$binwidth.x==aggID$binwidth.y)) || (!all(aggID$epoch_start.x==aggID$epoch_start.y)) || (!all(aggID$epoch_end.x==aggID$epoch_end.y)) ))
+    agg <- merge(aggID_one,aggID_two,by=c('ID',groupvars,'bin'))
+
+    if( ( (!all(agg$binwidth.x==agg$binwidth.y)) || (!all(agg$epoch_start.x==agg$epoch_start.y)) || (!all(agg$epoch_end.x==agg$epoch_end.y)) ))
       stop('Epochs/binning is different for the different ROIs. Data will not match up')
 
-    if(difference){
-      aggID$val <- aggID$val.x - aggID$val.y
-    } else if (logRatio){
-      aggID$val <- log((aggID$val.x+1.0) / (aggID$val.y+1.0))
-    } else {
-      print ("Error. Neither difference nor logRatio are true. You should not see this message.")
-    }
+    agg <- dplyr::select(agg, -epoch_start.y, -epoch_end.y, -binwidth.y)
 
-    aggID <- dplyr::rename(aggID,
+    agg <- dplyr::rename(agg,
                            epoch_start = epoch_start.x,
                            epoch_end = epoch_end.x,
                            binwidth = binwidth.x)
 
+    if(type == 'difference'){
+      agg$val <- agg$val.x - agg$val.y
+    } else if (type == 'logRatio'){
+      agg$val <- log((agg$val.x+1.0) / (agg$val.y+1.0))
+    } else if(type == 'proportion'){
+      agg$val <- agg$val.x / agg$val.y
+    }
+
     #one_of to use character vectors here (unfortunately not possible with group_by)
-    aggID <- dplyr::select(aggID,ID,one_of(groupvars),bin,val,epoch_start,epoch_end,binwidth)
+    agg <- dplyr::select(agg,ID,one_of(groupvars),bin,val,epoch_start,epoch_end,binwidth)
 
     if(level=='group'){
       #apparently dplyr does not like character vectors (groupvars) and 'static' column names. this is the workaround:
       tmpvars = sapply(c('bin','epoch_start','epoch_end','binwidth',groupvars), . %>% {as.formula(paste0('~', .))})
-      agg <- dplyr::group_by_(aggID,.dots=tmpvars) %>%
+      agg <- dplyr::group_by_(agg,.dots=tmpvars) %>%
         dplyr::summarise(val = mean(val,na.rm=T))
     }
-    else
-      agg <- aggID
+
+    agg$roi <- type
+
   }
-
-    if(difference){
-      agg$roi <- 'difference'
-    } else if(logRatio){
-      agg$roi <- 'log ratio'
-    }
-
   else{
     for(r in rois){
       aggtmp <- do_agg_fixations(obj,event=event,
@@ -405,9 +411,11 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
     }
   }
 
+  # force garbage collection:
+  gc()
+
   return(agg)
 }
-
 
 downsample <- function (v, N){ # v is the input vector, and keep every N sample
   seed <- c(TRUE,rep(FALSE,N-1))
@@ -491,4 +499,3 @@ itrackR.data <- function(data){
 
   return(output)
 }
-

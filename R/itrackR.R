@@ -40,7 +40,6 @@ itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1
 
 }
 
-
 load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 
   fields <- c('fixations','saccades','blinks','messages','header')
@@ -165,7 +164,6 @@ find_messages <- function(obj,varnames,patterns,numeric.only = FALSE,timestamp=F
 
 }
 
-
 add_behdata <- function(obj,beh,append=FALSE){
 
   if(append){
@@ -187,26 +185,16 @@ add_behdata <- function(obj,beh,append=FALSE){
   return(obj)
 }
 
-
-
-
-
 get_subdata <- function(obj,id,fields = c('header','samples'))
 {
   subobj <- itrackr()
 
   for(f in fields)
   {
-
     subobj[[f]] <- subset(obj[[f]],ID==id)
-
   }
 
   return(subobj)
-
-
-
-
 }
 
 
@@ -285,8 +273,7 @@ makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius
 
 eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL,roi=NULL){
 
-
-  #if we're getting epoched fixation data, we already have whwat we need, just need to grab the right variables, etc.
+  #if we're getting epoched fixation data, we already have what we need, just need to grab the right variables, etc.
   if(eyedata=='epoched_fixations'){
 
     if(is.null(event) || is.null(roi))
@@ -299,17 +286,18 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
 
     if(behdata[1] !='all'){
       beh_to_keep <- intersect(behdata,realbehvars)
+#~       print(beh_to_keep)
     }
     else
       beh_to_keep <- intersect(colnames(beh),realbehvars)
 
-      timevars <- names(eyes)[grepl('^t[1-9]',names(eyes))]
+    timevars <- names(eyes)[grepl('^t[1-9]',names(eyes))]
 
-      output <- dplyr::right_join(beh[c('ID','eyetrial',obj$indexvars,beh_to_keep)],eyes,by=c('ID','eyetrial',obj$indexvars))
-      output <- dplyr::arrange(output,ID,eyetrial)
+    output <- dplyr::right_join(beh[c('ID','eyetrial',obj$indexvars,beh_to_keep)],eyes,by=c('ID','eyetrial',obj$indexvars))
+    output <- dplyr::arrange(output,ID,eyetrial)
 
-      # eye_to_keep <- c('ID','eyetrial',obj$indexvars,beh_to_keep,'roi','epoch_start','epoch_end','binwidth','sttime','entime',paste0(roi,'_hit'),timevars)
-      #eyes <- eyes[eye_to_keep]
+    # eye_to_keep <- c('ID','eyetrial',obj$indexvars,beh_to_keep,'roi','epoch_start','epoch_end','binwidth','sttime','entime',paste0(roi,'_hit'),timevars)
+    #eyes <- eyes[eye_to_keep]
   }
   else{
 
@@ -351,7 +339,6 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
 
   return(output)
 }
-
 
 drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
 

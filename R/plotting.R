@@ -3,7 +3,7 @@
 #
 # }
 
-plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',names=FALSE,IDs=c()){
+plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0){
 
   if (length(IDs) != 0) {
     obj$fixations = subset(obj$fixations, ID %in% IDs)
@@ -12,31 +12,38 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
   if(rois && !is.null(obj$rois)){
     df <- rois2df(obj)
 
-    if(which[1] !='all')
-      df <- subset(df,name %in% which)
+    if(whichROIs[1] !='all')
+      df <- subset(df,name %in% whichROIs)
 
+    p <- ggplot2::ggplot() +
+      ggplot2::geom_polygon(data=df, ggplot2::aes(x=x,y=y,group=name),fill='gray',alpha=0.5)
 
-    p <- ggplot2::ggplot() + ggplot2::geom_polygon(data=df, ggplot2::aes(x=x,y=y,group=name),fill='gray',alpha=0.5)+
-      ggplot2::geom_point(data=obj$fixations,ggplot2::aes(x=gavx,y=gavy),color='yellow',size=0.7)
+    if(summarize > 0){
+      p <- p + ggplot2::stat_bin2d(data=obj$fixations,ggplot2::aes(x=gavx,y=gavy, size = ..count..), color='yellow',bins = summarize, geom = "point")
+    } else {
+      p <- p + ggplot2::geom_point(data=obj$fixations,ggplot2::aes(x=gavx,y=gavy),color='yellow',size=0.7)
+    }
 
     if(names)
       p <- p + ggplot2::geom_text(data=unique(df[c('xcenter','ycenter','name')]),aes(x=xcenter,y=ycenter,label=name),color='white')
   }
-  else
-    p <- ggplot2::ggplot(obj$fixations,ggplot2::aes(x=gavx,y=gavy)) + ggplot2::geom_point(color='yellow',size=0.7)
-
+  else{
+     if(summarize > 0){
+      p <- ggplot2::ggplot(obj$fixations,ggplot2::aes(x=gavx,y=gavy)) + ggplot2::stat_bin2d(bins = summarize, ggplot2::aes(size = ..count..), color = 'yellow', geom = "point")
+    } else {
+      p <- ggplot2::ggplot(obj$fixations,ggplot2::aes(x=gavx,y=gavy)) + ggplot2::geom_point(color='yellow',size=0.7)
+    }
+  }
 
   if(zoom)
     p <- p + ggplot2::coord_cartesian(xlim=c(0,obj$resolution[1]), ylim=c(obj$resolution[2],0))
   else
     p <- p + ggplot2::coord_cartesian(xlim=c(0,max(obj$fixations$gavx)), ylim=c(max(obj$fixations$gavy),0))
 
-
   p <- p + ggplot2::scale_y_reverse() +
     ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'black'),
                           panel.grid.major = ggplot2::element_blank(),
                           panel.grid.minor = ggplot2::element_blank())
-
 
   if(crosshairs){
     p <- p +
@@ -44,16 +51,15 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',na
       ggplot2::geom_vline(xintercept=round(obj$resolution[1]/2),color='red',size=0.3,linetype='dashed')
   }
 
-
-
-  p <- p + ggplot2::facet_wrap(~ID)
+  if(!summarize){
+    p <- p + ggplot2::facet_wrap(~ID)
+  }
 
   p
   return(p)
 }
 
-
-plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level='group',difference=FALSE,logRatio=FALSE,filter=NULL){
+plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level='group',type='probability',filter=NULL){
 
   if(is.null(event)){
     event = 'default_event'
@@ -64,9 +70,8 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
                                        groupvars = c(lines,rows,cols),
                                        shape='long',
                                        level=level,
-                                       difference=difference,
-                                       logRatio=logRatio,
-                                       filter=NULL)
+                                       type=type,
+                                       filter=filter)
 
   mainvars <- c('bin','val','roi','epoch_start','epoch_end','binwidth')
   othervars <- names(agg)[-which(names(agg) %in% mainvars)]
@@ -88,14 +93,24 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
   }
 
   plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=lines,color=lines))+
-    ggplot2::geom_line(size=.75) +
-    ggplot2::geom_point(size=3) + ggplot2::xlab('time (ms)') + ggplot2::ylab('probability of fixation (%)') +
+    ggplot2::geom_line() + #size=.75) +
+    ggplot2::geom_point(size=1.5) +
+    ggplot2::xlab('time (ms)') +
     ggplot2::geom_vline(ggplot2::aes(xintercept = 0), alpha=0.5, linetype='dashed') +
     ggplot2::scale_color_discrete(name = toString(lines)) +
-    ggplot2::scale_x_continuous(breaks = seq(min(tmp$bin),max(tmp$bin),100))
+    ggplot2::scale_x_continuous() #breaks = seq(min(tmp$bin),max(tmp$bin),100))
+    # using different than default breaks results in too much breaks (at least for me)
 
-  if(difference || logRatio){
-    plt <- plt + ggplot2::geom_hline(yintercept=0)
+  if(type == 'difference'){
+    plt <- plt + ggplot2::geom_hline(yintercept=0) +
+            ggplot2::ylab('difference of fixations')
+  } else if (type == 'logRatio'){
+    plt <- plt + ggplot2::geom_hline(yintercept=0) +
+            ggplot2::ylab('log gaze of fixations')
+  } else if(type == 'proportion') {
+    plot <- plt + ggplot2::ylab('proportion of fixations')
+  } else if(type == 'probability') {
+    plt <- plt + ggplot2::ylab('probability of fixations (%)')
   }
 
   if (!is.null(rows) | !is.null(cols)){
@@ -106,7 +121,6 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
       colexp='.'
 
     facetexp <- paste(rowexp,colexp,sep=" ~ ")
-
 
     plt <- plt + ggplot2::facet_grid(facetexp)
   }
@@ -157,7 +171,6 @@ plot_random_epochs <- function(epochs,n=100)
 
 }
 
-
 plot.rois <- function(obj,which='all',crosshairs=T){
 
   df <- rois2df(obj)
@@ -173,8 +186,6 @@ plot.rois <- function(obj,which='all',crosshairs=T){
                    panel.grid.major = ggplot2::element_blank(),
                    panel.grid.minor = ggplot2::element_blank())
 
-
-
   if(crosshairs){
     p <- p +
       ggplot2::geom_hline(yintercept=obj$resolution[2]/2,color='red',size=0.3,linetype='dashed') +
@@ -183,9 +194,7 @@ plot.rois <- function(obj,which='all',crosshairs=T){
 
   p
   return(p)
-
 }
-
 
 plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.start=NULL,time.end=NULL){
 
@@ -244,7 +253,6 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
     fixations <- obj$fixations[obj$fixations$ID==ID,]
     fixations$time <- fixations$sttime
 
-
     fixations <- subset(fixations,time>=range_start & time<=range_end)
 
     fixations <- dplyr::left_join(fixations,samps[c('time','index','bin')],by='time')
@@ -254,11 +262,8 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
     fixations$xmin <- fixations$index
     fixations$xmax <- fixations$index + (fixations$entime - fixations$sttime)
 
-
-
     blinks <- obj$blinks[obj$blinks$ID==ID,]
     blinks$time <- blinks$sttime
-
 
     blinks <- subset(blinks,time>=range_start & time<=range_end)
 
@@ -293,10 +298,8 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
       warning('timestamp message not found')
   }
 
-
   xbreaks <- downsamps$index[seq(1,nrow(downsamps),100)]
   xlabels <- floor((downsamps$time[seq(1,nrow(downsamps),100)]-timestart)/1000)
-
 
   #draw the pupil data
     plt <- plt +
@@ -306,7 +309,6 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
       ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'white'),
                               panel.grid.major = ggplot2::element_blank(),
                               panel.grid.minor = ggplot2::element_blank())
-
 
     if(bin)
       plt <- plt + ggplot2::facet_wrap(~bin,ncol=1,scales = 'free_x') + ggplot2::ylab('pupil size (arbitrary units)') + ggplot2::scale_x_continuous(name='time (seconds)',breaks=xbreaks,labels=xlabels)
