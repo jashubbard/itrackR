@@ -40,7 +40,6 @@ itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1
 
 }
 
-
 load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 
   fields <- c('fixations','saccades','blinks','messages','header')
@@ -107,12 +106,7 @@ fixdata <- dplyr::mutate(fixdata,
 else if(type=='saccades'){
 
 
-
-
 }
-
-
-
 
 fixdata$ID <- as.numeric(gsub("([0-9]*).*","\\1",fixdata$ID))
 
@@ -170,7 +164,6 @@ find_messages <- function(obj,varnames,patterns,numeric.only = FALSE,timestamp=F
 
 }
 
-
 add_behdata <- function(obj,beh,append=FALSE){
 
   if(append){
@@ -181,7 +174,8 @@ add_behdata <- function(obj,beh,append=FALSE){
   else{
 
     eyedata <- obj$header[c('ID','eyetrial',obj$indexvars)]
-    eyedata <- cbind(eyedata,obj$header[obj$timevars] - obj$header$starttime)
+#~     eyedata <- cbind(eyedata,obj$header[obj$timevars] - obj$header$starttime)
+    eyedata <- cbind(eyedata,obj$header$starttime)
 
     behmerged <- merge(beh,eyedata,by=c('ID',obj$indexvars),all.x=T)
     obj$beh <- behmerged
@@ -191,31 +185,21 @@ add_behdata <- function(obj,beh,append=FALSE){
   return(obj)
 }
 
-
-
-
-
 get_subdata <- function(obj,id,fields = c('header','samples'))
 {
   subobj <- itrackr()
 
   for(f in fields)
   {
-
     subobj[[f]] <- subset(obj[[f]],ID==id)
-
   }
 
   return(subobj)
-
-
-
-
 }
 
 
-
-makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,angles=NULL,names=NULL,append=F){
+# coords defaults to (0, 0) so you can specify a polygon without the need to specify coords (it is not used because all coordinates are inside the poylgon data frame)
+makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius=0,xradius=0,yradius=0,angles=NULL,names=NULL,polygon=data.frame(x=c(),y=c()),append=F){
 
   if(length(shapes)==1 && nrow(coords)>1)
     shapes <- rep(shapes[1],nrow(coords))
@@ -236,39 +220,52 @@ makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,ang
     obj$rois <- list()
   }
   else if(length(obj$rois)>0 && append==T){
-   start_roi = length(obj$rois)+1
+    start_roi = length(obj$rois)+1
   }
 
+  if(is.null(names)){
+    names <- start_roi:(start_roi-1+nrow(coords))
+  }
 
-  if(is.null(names))
-    names <- start_roi:nrow(coords)
+	roipos <- start_roi
 
-  roipos <- start_roi
+	if(shapes[[1]] == 'polygon'){
+		# for a polygon only one ROI at a time is possible
+			tmpROI <- list()
 
+			tmpROI$roi = spatstat::owin(poly=polygon)
+			tmpROI$name <- names[[1]]
+			tmpROI$shape <- 'polygon'
+			tmpROI$center <- spatstat::centroid.owin(tmpROI$roi)
+			tmpROI$radius <- NA
+			tmpROI$xradius <- NA
+			tmpROI$yradius <- NA
 
- for(i in 1:nrow(coords)){
+			obj$rois[[roipos]] = tmpROI
+	} else {
 
-    tmpROI <- list()
+		for(i in 1:nrow(coords)){
 
-    if(shapes[[i]]=='circle')
-      tmpROI$roi <- spatstat::disc(radius=radius[[i]],centre=coords[i,])
-    else if(shapes[[i]]=='ellipse')
+			tmpROI <- list()
 
-      tmpROI$roi <- spatstat::ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])
+			if(shapes[[i]]=='circle'){
+				tmpROI$roi <- spatstat::disc(radius=radius[[i]],centre=coords[i,])
+			}
+			else if(shapes[[i]]=='ellipse'){
+				tmpROI$roi <- spatstat::ellipse(xradius[[i]],yradius[[i]],centre=coords[i,],phi=angles[[i]])
+			}
 
+			tmpROI$name <- names[[i]]
+			tmpROI$shape <- shapes[[i]]
+			tmpROI$center <- coords[i,]
+			tmpROI$radius <- radius[[i]]
+			tmpROI$xradius <- xradius[[i]]
+			tmpROI$yradius <- yradius[[i]]
 
-    tmpROI$name <- names[[i]]
-    tmpROI$shape <- shapes[[i]]
-    tmpROI$center <- coords[i,]
-    tmpROI$radius <- radius[[i]]
-    tmpROI$xradius <- xradius[[i]]
-    tmpROI$yradius <- yradius[[i]]
-
-    obj$rois[[roipos]] <- tmpROI
-    roipos <- roipos + 1
-
- }
-
+			obj$rois[[roipos]] <- tmpROI
+			roipos <- roipos + 1
+		}
+	}
   return(obj)
 
 }
@@ -276,86 +273,72 @@ makeROIs <- function(obj,coords,shapes='circle',radius=0,xradius=0,yradius=0,ang
 
 eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL,roi=NULL){
 
-
-  #if we're getting epoched fixation data, we already have whwat we need, just need to grab the right variables, etc.
+  #if we're getting epoched fixation data, we already have what we need, just need to grab the right variables, etc.
   if(eyedata=='epoched_fixations'){
 
     if(is.null(event) || is.null(roi))
       stop('You must provide the name of the time-locking event and the ROI')
 
-
     eyes <- obj$epochs$fixations[[event]][[roi]]
     beh <- obj$beh
 
-
-
     realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars))
 
-    if(behdata[1] !='all')
+    if(behdata[1] !='all'){
       beh_to_keep <- intersect(behdata,realbehvars)
+#~       print(beh_to_keep)
+    }
     else
       beh_to_keep <- intersect(colnames(beh),realbehvars)
 
+    timevars <- names(eyes)[grepl('^t[1-9]',names(eyes))]
 
-      timevars <- names(eyes)[grepl('^t[1-9]',names(eyes))]
+    output <- dplyr::right_join(beh[c('ID','eyetrial',obj$indexvars,beh_to_keep)],eyes,by=c('ID','eyetrial',obj$indexvars))
+    output <- dplyr::arrange(output,ID,eyetrial)
 
-      output <- dplyr::right_join(beh[c('ID','eyetrial',obj$indexvars,beh_to_keep)],eyes,by=c('ID','eyetrial',obj$indexvars))
-      output <- dplyr::arrange(output,ID,eyetrial)
-
-      # eye_to_keep <- c('ID','eyetrial',obj$indexvars,beh_to_keep,'roi','epoch_start','epoch_end','binwidth','sttime','entime',paste0(roi,'_hit'),timevars)
-      #eyes <- eyes[eye_to_keep]
-
+    # eye_to_keep <- c('ID','eyetrial',obj$indexvars,beh_to_keep,'roi','epoch_start','epoch_end','binwidth','sttime','entime',paste0(roi,'_hit'),timevars)
+    #eyes <- eyes[eye_to_keep]
   }
-else{
+  else{
 
-  #regular fixations or saccades
-  eyes <- obj[[eyedata]]
-  beh <- obj$beh
+    #regular fixations or saccades
+    eyes <- obj[[eyedata]]
+    beh <- obj$beh
 
-  #add trial header information
-  beh <- dplyr::left_join(beh,obj$header[c('ID','eyetrial','starttime')], by=c('ID','eyetrial'))
+    #add trial header information
+    beh <- dplyr::left_join(beh,obj$header[c('ID','eyetrial','starttime')], by=c('ID','eyetrial'))
 
 
-  #remove the roi_1, roi_2, ... columns
-  if(!all.rois && any(grepl('^roi_*',colnames(eyes)))){
-    eyes <- dplyr::select(eyes,-matches("^roi_*"))
+    #remove the roi_1, roi_2, ... columns
+    if(!all.rois && any(grepl('^roi_*',colnames(eyes)))){
+      eyes <- dplyr::select(eyes,-matches("^roi_*"))
+    }
+
+    #if we want only some of the behavioral variables
+    if(behdata[1] !='all')
+      beh <- dplyr::select_(beh,.dots=unique(c('ID','eyetrial','starttime',obj$indexvars,behdata)))
+
+    #in case there are variable names in common between eyedata and behdata, besides index variables
+    #remove them from eyedata
+    realvars <- setdiff(colnames(eyes),c('ID','eyetrial','starttime',obj$indexvars))
+    commonvars <- intersect(realvars,colnames(beh))
+
+    if(length(commonvars)>0)
+      eyes <- eyes[!(colnames(eyes) %in% commonvars)]
+
+    #merge behavioral and eye data
+    output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
+    output <- dplyr::arrange(output,ID,eyetrial)
+
+    output <- dplyr::rename(output,
+                           trialsttime = starttime)
+
+    output$sttime <- output$sttime - output$trialsttime
+    output$entime <- output$entime - output$trialsttime
   }
-
-  #if we want only some of the behavioral variables
-  if(behdata[1] !='all')
-    beh <- dplyr::select_(beh,.dots=unique(c('ID','eyetrial','starttime',obj$indexvars,behdata)))
-
-  #in case there are variable names in common between eyedata and behdata, besides index variables
-  #remove them from eyedata
-  realvars <- setdiff(colnames(eyes),c('ID','eyetrial','starttime',obj$indexvars))
-  commonvars <- intersect(realvars,colnames(beh))
-
-  if(length(commonvars)>0)
-    eyes <- eyes[!(colnames(eyes) %in% commonvars)]
-
-  #merge behavioral and eye data
-  output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
-  output <- dplyr::arrange(output,ID,eyetrial)
-
-  output <- dplyr::rename(output,
-                         trialsttime = starttime)
-
-  output$sttime <- output$sttime - output$trialsttime
-  output$entime <- output$entime - output$trialsttime
-
-}
-
-
-
 
   return(output)
-
-
-
-
-
 }
-
 
 drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
 

@@ -9,7 +9,7 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-This will acquaint you with some of the basics of itrackR. There are a number of function for doing high-level analyses of eyetracking data. 
+This will acquaint you with some of the basics of itrackR. There are a number of function for doing high-level analyses of eyetracking data.
 
 
 ##Example Data
@@ -30,13 +30,13 @@ beh <- itrackR.data('beh')
 datapath
 
 ```
-`edfs` is a list of the 2 edfs found in that folder: 
+`edfs` is a list of the 2 edfs found in that folder:
 
 ```{r}
 edfs
 ```
 
-`beh` is a data frame of the behavioral data for the same 2 subjects. 
+`beh` is a data frame of the behavioral data for the same 2 subjects.
 
 ```{r, echo=FALSE, results='asis'}
 knitr::kable(head(beh, 10))
@@ -55,7 +55,7 @@ z <- itrackr(edfs=edfs)
 
 ## Object Structure
 
-The `itrackR` object consists of fields for each relevant event. Each one is a data frame. The `ID` fields specifies each subject. The subject ID is formed from extracting only the numeric data from the EDF file. 
+The `itrackR` object consists of fields for each relevant event. Each one is a data frame. The `ID` fields specifies each subject. The subject ID is formed from extracting only the numeric data from the EDF file.
 
 `z$fixations`
 ```{r, echo=FALSE, results='asis'}
@@ -75,7 +75,7 @@ knitr::kable(head(z$messages, 10))
 
 ## ROIs
 
-Much of the analysis depends on specifying regions of interest (ROIs). We can then determine if fixations lie within these ROIs. First we specify all possible ROIs that may occur in an experiment. The function `radialCoords` makes it easy to specify a set of evenly-spaced coordinates arranged in a ring. We will create elliptical ROIs in this example. `roiFlower` makes it easy to rotate the ellipses to make a flower-like pattern. 
+Much of the analysis depends on specifying regions of interest (ROIs). We can then determine if fixations lie within these ROIs. First we specify all possible ROIs that may occur in an experiment. The function `radialCoords` makes it easy to specify a set of evenly-spaced coordinates arranged in a ring. We will create elliptical ROIs in this example. `roiFlower` makes it easy to rotate the ellipses to make a flower-like pattern.
 
 ```{r}
 #generate coordinates for our ROIs
@@ -107,7 +107,7 @@ plot.rois(z)
 
 ```
 
-Finally let's include a central, circular ROI. 
+Finally let's include a central, circular ROI.
 
 ```{r,fig.width=5, fig.height=4}
 
@@ -122,7 +122,7 @@ plot.rois(z)
 
 ## Plotting
 
-Once the ROIs are added, we can easily make scatterplots of fixations for each subject. This allows us to find calibration issues. 
+Once the ROIs are added, we can easily make scatterplots of fixations for each subject. This allows us to find calibration issues.
 
 ```{r, fig.show='hold', fig.width=6, fig.height=4}
 plot(z, zoom=TRUE)
@@ -130,7 +130,7 @@ plot(z, zoom=TRUE)
 
 ## Merging with behavioral data
 
-Ideally, we send a message to Eyelink on every trial in order to identify it in the EDF file. Every time the eyetracker is started and stopped, we call this a separate trial. In this example, every trial the message "BLOCK X" and "TRIAL X" was sent to eyelink. We can see the trial-wise information in the header of our object: 
+Ideally, we send a message to Eyelink on every trial in order to identify it in the EDF file. Every time the eyetracker is started and stopped, we call this a separate trial. In this example, every trial the message "BLOCK X" and "TRIAL X" was sent to eyelink. We can see the trial-wise information in the header of our object:
 
 `z$header`
 ```{r}
@@ -139,9 +139,9 @@ knitr::kable(head(z$header, 10))
 
 Next we specify index variables that uniquely identify trials. This should be present in both the edf and behavioral file. `set_index` searches through the messages, finds the relevant ones, and extracts the numeric data. `set_index` can take a regular expression to find anything that matches this pattern, and `numeric.only` tells it to ignore any text (e.g., "BLOCK "). The variable names are stored in `z$indexvars` and the information is added to `z$header`.
 
-`find_messages` is for pulling other message information from the EDF file. Here we want to have the timestamps of the stimulus onset and the response so we can refer to them later. 
+`find_messages` is for pulling other message information from the EDF file. Here we want to have the timestamps of the stimulus onset and the response so we can refer to them later.
 
-`add_behdata` merges the behavioral file with the eye data, based on the index variables. This only works if we run `set_index` first (so we have `Block` and `Trial` variables in the behavioral data frame, and in our itrackR object).  
+`add_behdata` merges the behavioral file with the eye data, based on the index variables. This only works if we run `set_index` first (so we have `Block` and `Trial` variables in the behavioral data frame, and in our itrackR object).
 
 ```{r}
 #find messages to use as our index variables (to merge with our behavioral data)
@@ -173,7 +173,7 @@ knitr::kable(head(z$header, 10))
 It looks like subject 104 is off-center, due to poor calibration. We can correct for this using `drift_correct`. We can optionally specify a grouping variable (from the behavioral data) so that correction is done separately for each level of that variable. In this case, let's perform correction for each subject and block. The threshold specifies the minimum amount of movement detected before we actually do any correction.
 
 ```{r,fig.width=6, fig.height=4}
-z <- drift_correct(z,vars='Block',threshold=15) 
+z <- drift_correct(z,vars='Block',threshold=15)
 plot(z,zoom=T)
 ```
 
@@ -194,7 +194,7 @@ Note that the `fixations` data frame now has binary vectors for each ROI specify
 knitr::kable(head(z$fixations, 10))
 ```
 
-This is not terribly useful if your task-relevant ROI changes positions on each trial. You can use `mapROIs` map your experiment-wide ROIs (1,2,3...13) to trial-specific ROIs ('target','distractor'). You just need a variable in your behavioral data that specifies the number of the relevant ROI. Here, `Targetpos` specifies the target location, and `Distractorpos` specifies the distractor location: 
+This is not terribly useful if your task-relevant ROI changes positions on each trial. You can use `mapROIs` map your experiment-wide ROIs (1,2,3...13) to trial-specific ROIs ('target','distractor'). You just need a variable in your behavioral data that specifies the number of the relevant ROI. Here, `Targetpos` specifies the target location, and `Distractorpos` specifies the distractor location:
 
 ```{r}
 z <- mapROIs(z,names=c('target','distractor'),indicators=c('Targetpos','Distractorpos'))
@@ -208,7 +208,7 @@ knitr::kable(head(z$fixations, 10))
 
 ##Saving data
 
-Next we probably want to do statistics on our eyetracking data. We want to have our behavioral data merged with the eye data, including our ROI "hits". Just use `eyemerge` to pull out the relevant information. Any eyetracking data that does not match behavioral data will still be included (all behavioral variables will just be `NA`).  
+Next we probably want to do statistics on our eyetracking data. We want to have our behavioral data merged with the eye data, including our ROI "hits". Just use `eyemerge` to pull out the relevant information. Any eyetracking data that does not match behavioral data will still be included (all behavioral variables will just be `NA`).
 
 ```{r}
 fixes <- eyemerge(z,'fixations')
@@ -223,22 +223,22 @@ fixes_all <- eyemerge(z,'fixations',all.rois = T)
 
 
 ## Timeseries plots
-Sometimes you want to see the tendency of the eyes to look at a particular ROI over time, relevative to some event. To look at this, we first determine epochs around our event of interest, in this case, `STIMONSET`. We first run `epoch_fixations` for each ROI that we're interested in. 
+Sometimes you want to see the tendency of the eyes to look at a particular ROI over time, relative to some event. To look at this, we first determine epochs around our event of interest, in this case, `STIMONSET`. We first run `epoch_fixations` for each ROI that we're interested in.
 
 ```{r}
-#start at stimulus onset, going 700ms after that point. Bin the data into 25ms time bins. 
+#start at stimulus onset, going 700ms after that point. Bin the data into 25ms time bins.
 z <- epoch_fixations(z,'target',event='STIMONSET',start = 0, end = 700, binwidth = 25)
 z <- epoch_fixations(z,'distractor',event='STIMONSET',start = 0, end = 700, binwidth = 25)
 ```
 
-Next we want to visualize these timeseries using `plot.timeseries`. We can generate separate lines for each level of a factor (specified in the behavioral data) or for different ROIs. You can specify variables that define the different lines, as well as the rows and columns in separate panels. Behind the scenes, the function first aggregates based on `ID` and the factors your specify, then across subjects. 
+Next we want to visualize these timeseries using `plot.timeseries`. We can generate separate lines for each level of a factor (specified in the behavioral data) or for different ROIs. You can specify variables that define the different lines, as well as the rows and columns in separate panels. Behind the scenes, the function first aggregates based on `ID` and the factors your specify, then across subjects.
 
 ```{r,fig.width=7, fig.height=4}
 #plot the timeseries data for fixations to target, separately for the Conflict and Task conditions
 plot.timeseries(z,event='STIMONSET',rois=c('target'),lines=c('Conflict'),cols='Task')
 
 #plot fixations to target and disctractor for the same conditions
-#you must specify 'roi' as one of the plotting variables for it to work. 
+#you must specify 'roi' as one of the plotting variables for it to work.
 plot.timeseries(z,event='STIMONSET',rois=c('target','distractor'),lines=c('roi','Conflict'),cols='Task')
 
 #plot difference waves (target - distractor fixations). Plot on separate rows insetead of columns.

@@ -7,8 +7,9 @@ rois2df <- function(obj,which='all'){
     eltmp <- as.data.frame(spatstat::vertices(obj$rois[[i]]$roi))
 
     eltmp$name <- obj$rois[[i]]$name
-    eltmp$xcenter <- obj$rois[[i]]$center[1]
-    eltmp$ycenter <- obj$rois[[i]]$center[2]
+    #as numeric because spatstat::centroid.owin (used for the center of polygons) seems to not return numerics
+    eltmp$xcenter <- as.numeric(obj$rois[[i]]$center[1])
+    eltmp$ycenter <- as.numeric(obj$rois[[i]]$center[2])
     eltmp$xradius <- obj$rois[[i]]$xradius
     eltmp$yradius <- obj$rois[[i]]$yradius
     eltmp$radius <- obj$rois[[i]]$radius

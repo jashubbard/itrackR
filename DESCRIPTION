@@ -26,5 +26,7 @@ Depends:
     foreach,
     magrittr,
     data.table
-Suggests: rmarkdown
+Suggests:
+    rmarkdown
 VignetteBuilder: knitr
+RoxygenNote: 5.0.1
