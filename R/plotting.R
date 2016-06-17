@@ -102,7 +102,7 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
     # using different than default breaks results in too much breaks (at least for me)
 
   if(type == 'difference'){
-    plt <- plt + ggplot2::geom_hline(yintercept=0) +
+    plt <- plt + ggplot2::geom_hline(yintercept=0,linetype='dashed',alpha=0.7) +
             ggplot2::ylab('difference of fixations')
   } else if (type == 'logRatio'){
     plt <- plt + ggplot2::geom_hline(yintercept=0) +

@@ -70,3 +70,20 @@ check_for_samples <- function(obj)
 }
 
 
+timeshift <- function(df,baseline,cols){
+  #adjusts the named columns by some baseline
+  #baseline can be scalar or a vector
+  #useful for computing relative time from start of experiment, or trial-by-trial time.
+
+  df[cols] <- df[,cols] - baseline
+
+  return(df)
+
+
+
+
+
+
+
+}
+

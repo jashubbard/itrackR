@@ -49,14 +49,16 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 
   alldata <- edfR::combine.eyedata(allbatch,fields=fields)
 
-  obj$header <- alldata$header
-  obj$fixations <- alldata$fixations
+  baseline <- alldata$header$starttime[1]
+
+  obj$header <- timeshift(alldata$header, baseline, c('starttime','endtime'))
+  obj$fixations <- timeshift(alldata$fixations,baseline,c('sttime','entime'))
   obj$fixations$fixation_key <- 1:nrow(obj$fixations)
-  obj$saccades <- alldata$saccades
+  obj$saccades <-  timeshift(alldata$saccades,baseline,c('sttime','entime'))
   obj$saccades$saccade_key <- 1:nrow(obj$saccades)
-  obj$blinks <-alldata$blinks
+  obj$blinks <- timeshift(alldata$blinks,baseline,c('sttime','entime'))
   obj$blinks$blink_key <- 1:nrow(obj$blinks)
-  obj$messages <- alldata$messages
+  obj$messages <-  timeshift(alldata$messages,baseline,'sttime')
   obj$messages$message_key <- 1:nrow(obj$messages)
 
 #   if(samples)
@@ -271,7 +273,7 @@ makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius
 }
 
 
-eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL,roi=NULL){
+eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL,roi=NULL,trialtime = TRUE){
 
   #if we're getting epoched fixation data, we already have what we need, just need to grab the right variables, etc.
   if(eyedata=='epoched_fixations'){
@@ -333,8 +335,11 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     output <- dplyr::rename(output,
                            trialsttime = starttime)
 
-    output$sttime <- output$sttime - output$trialsttime
-    output$entime <- output$entime - output$trialsttime
+    #by default, change starting and endind times of fixations relative to trial start
+    if(trialtime){
+      output$sttime <- output$sttime - output$trialsttime
+      output$entime <- output$entime - output$trialsttime
+    }
   }
 
   return(output)
@@ -344,7 +349,7 @@ drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
 
   fixnames <- names(obj$fixations)
 
-  fixdata <- eyemerge(obj,behdata=unique(c('ID','eyetrial',vars)))
+  fixdata <- eyemerge(obj,behdata=unique(c('ID','eyetrial',vars)),trialtime=FALSE)
 
   fixdata <- dplyr::group_by_(fixdata,.dots=vars)
   fixdata <- dplyr::mutate(fixdata,

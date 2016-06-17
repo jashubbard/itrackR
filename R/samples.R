@@ -37,85 +37,92 @@ epoch_samples <- function(obj,timevar,field='pa',epoch=c(-100,100))
 
 }
 
-load_samples <- function(obj,outdir=NULL, force=F){
-
+load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
 
 
   allsamps <- list()
   samps <- data.table::data.table()
   alldata <- list()
 
-  ncores <- parallel::detectCores()
-  cl <- parallel::makeCluster((ncores/2)-1)
-  doParallel::registerDoParallel(cl)
-
-
+  #check for directory to save .rds files into
   if(!is.null(outdir))
-    obj$sample.dir <- outdir
-  else if(is.null(outdir) && is.null(obj$sample.dir))
-    obj$sample.dir <- tempdir()
+    obj$sample.dir <- outdir #if given as argument
+
+  #otherwise create temporary directory
+  else if(is.null(outdir) && (is.null(obj$sample.dir) || !dir.exists(obj$sample.dir))){
+    tmpdir <- tempdir()
+    dir.create(tmpdir,showWarnings = F)
+    obj$sample.dir <- tmpdir
+
+  }
+
+  #default, run in parallel using foreach
+  if(parallel){
+
+    print('Loading samples (in parallel)...')
 
 
+    #set up cluster with maximum number of cores
+    ncores <- parallel::detectCores()
+    cl <- parallel::makeCluster(ncores)
+    doParallel::registerDoParallel(cl)
 
-  # i <- 1
-  allsamps <- foreach::foreach(edf=iterators::iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
-    # for(edf in obj$edfs)
-  {
-    # alldata <- edfR::edf.trials(edf,samples = T,eventmask = T)
-    # print('Loading samples...')
-    # samps <- data.table::data.table(alldata$samples)
-
-    id <- edf2id(edf)
-    fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
-
-    if(file.exists(fname) && !force)
-      samps <- readRDS(fname)
-    else{
-      samps <- data.table::as.data.table(edfR::edf.samples(edf,trials=T,eventmask=T))
-
-
-
-    if(all(is.na(samps$paL))){
-      samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
-      data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
-
-      #       samps <- dplyr::select(samps,-paL,-gxL,gyL)
-      #       samps <- dplyr::rename(samps,
-      #                              pa = paR,
-      #                              gx = gxR,
-      #                              gy = gyR)
-    } else{
-
-      samps[,(c("paR","gxR","gyR")) :=NULL]
-      data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
-
-      #       samps <- dplyr::select(samps,-paR,-gxR,gyR)
-      #       samps <- dplyr::rename(samps,
-      #                            pa = paL,
-      #                            gx = gxL,
-      #                            gy = gyL)
+    #run with dopar
+    allsamps <- foreach::foreach(edf=iterators::iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
+    {
+      fname <- load_sample_file(obj,edf)
+      fname
     }
 
+    parallel::stopCluster(cl)
+  }
+  else{
 
+    #serial method - use lapply
+    allsamps <- lapply(edfs, function(x) load_sample_file(obj,x))
 
-
-    saveRDS(samps,fname,compress = T)
-    }
-    # allsamps[[i]] <- fname
-    # rm(samps)
-    # i <- i+1
-    fname
   }
 
   rm(alldata)
   rm(samps)
 
-  parallel::stopCluster(cl)
+
 
   obj$samples <- allsamps
   return(obj)
 
 }
+
+load_sample_file <- function(obj,edf){
+
+   id <- edf2id(edf)
+   fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
+
+  if(file.exists(fname) && !force)
+    samps <- readRDS(fname)
+  else{
+    samps <- edfR::edf.samples(edf,trials=T,eventmask=T)
+    baseline <- obj$header$starttime[1]
+    # samps <- timeshift(samps,baseline,'time')
+
+    if(all(is.na(samps$paL))){
+      samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
+      data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
+
+    } else{
+
+      samps[,(c("paR","gxR","gyR")) :=NULL]
+      data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
+
+    }
+
+    saveRDS(samps,fname,compress = T)
+  }
+
+  return(fname)
+}
+
+
 
 interpolate.blinks <- function(y,blinks)
 {
