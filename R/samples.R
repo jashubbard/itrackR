@@ -79,7 +79,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
   else{
 
     #serial method - use lapply
-    allsamps <- lapply(edfs, function(x) load_sample_file(obj,x))
+    allsamps <- lapply(obj$edfs, function(x) load_sample_file(obj,x))
 
   }
 
