@@ -70,7 +70,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
     #run with dopar
     allsamps <- foreach::foreach(edf=iterators::iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
     {
-      fname <- load_sample_file(obj,edf)
+      fname <- load_sample_file(obj,edf,force=force)
       fname
     }
 
@@ -79,7 +79,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
   else{
 
     #serial method - use lapply
-    allsamps <- lapply(obj$edfs, function(x) load_sample_file(obj,x))
+    allsamps <- lapply(obj$edfs, function(x) load_sample_file(obj,x,force=force))
 
   }
 
@@ -93,7 +93,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
 
 }
 
-load_sample_file <- function(obj,edf){
+load_sample_file <- function(obj,edf,force=F){
 
    id <- edf2id(edf)
    fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
