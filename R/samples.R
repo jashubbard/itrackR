@@ -63,7 +63,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
 
 
     #set up cluster with maximum number of cores
-    ncores <- parallel::detectCores()
+
     cl <- parallel::makeCluster(ncores)
     doParallel::registerDoParallel(cl)
 
