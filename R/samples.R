@@ -231,8 +231,7 @@ get_all_epochs <- function(obj,epochname,baseline=NULL,baseline.method='percent'
     else
       behnames <- unique(c('ID','eyetrial',beh))
 
-    # behonly <- dplyr::select_(obj$beh,.dots=behnames)
-    behonly <- obj$beh[,behnames]
+    behonly <- dplyr::select_(obj$beh,.dots=behnames)
     epochs <- dplyr::right_join(behonly,epochs,by=c('ID','eyetrial'))
 
     if(shape=='long')
