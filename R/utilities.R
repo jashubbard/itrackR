@@ -359,8 +359,8 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
       stop('Using "roi" as a grouping variable does not work if you want to plot a contrast score.')
     }
 
-    aggID_one <- aggregate_fixation_timeseries(obj,event=event,roi=rois[1],groupvars = groupvars,shape='long',level='ID',filter=filter)
-    aggID_two <- aggregate_fixation_timeseries(obj,event=event,roi=rois[2],groupvars = groupvars,shape='long',level='ID',filter=filter)
+    aggID_one <- aggregate_fixation_timeseries(obj,event=event,roi=rois[1],groupvars = groupvars,shape='long',level='ID')
+    aggID_two <- aggregate_fixation_timeseries(obj,event=event,roi=rois[2],groupvars = groupvars,shape='long',level='ID')
 
     # force garbage collection:
     gc()
