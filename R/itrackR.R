@@ -1,23 +1,24 @@
 #class constructor
-itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir())
+itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir(),binocular=FALSE)
 {
 
   me <- list(
               edfs = edfs,
               ids = NULL,
               idvar = 'ID',
+              binocular = binocular,
               indexvars = NULL,
               timevars = NULL,
               resolution = resolution,
-              header = data.frame,
+              header = data.frame(),
               samples = list(),
               sample.dir = NULL,
-              fixations = data.frame,
-              saccades = data.frame,
-              blinks = data.frame,
-              messages = data.frame,
+              fixations = data.frame(),
+              saccades = data.frame(),
+              blinks = data.frame(),
+              messages = data.frame(),
               epochs = list(),
-              beh = data.frame,
+              beh = data.frame(),
               transform = list()
   )
 
@@ -49,17 +50,42 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 
   alldata <- edfR::combine.eyedata(allbatch,fields=fields)
 
-  baseline <- alldata$header$starttime[1]
+ #create key variables for each, for easy sorting
+  alldata$fixations$fixation_key <- 1:nrow(alldata$fixations)
+  alldata$saccades$saccade_key <- 1:nrow(alldata$saccades)
+  alldata$blinks$blink_key <- 1:nrow(alldata$blinks)
+  alldata$messages$message_key <- 1:nrow(alldata$messages)
 
-  obj$header <- timeshift(alldata$header, baseline, c('starttime','endtime'))
-  obj$fixations <- timeshift(alldata$fixations,baseline,c('sttime','entime'))
-  obj$fixations$fixation_key <- 1:nrow(obj$fixations)
-  obj$saccades <-  timeshift(alldata$saccades,baseline,c('sttime','entime'))
-  obj$saccades$saccade_key <- 1:nrow(obj$saccades)
-  obj$blinks <- timeshift(alldata$blinks,baseline,c('sttime','entime'))
-  obj$blinks$blink_key <- 1:nrow(obj$blinks)
-  obj$messages <-  timeshift(alldata$messages,baseline,'sttime')
-  obj$messages$message_key <- 1:nrow(obj$messages)
+
+  #get the baseline for each subject, repeated for all rows of their data in the header
+  header <- dplyr::group_by_(alldata$header, .dots=(obj$idvar)) %>%
+    dplyr::mutate(first_sample = first(starttime)-1) %>% dplyr::ungroup(.)
+  obj$header <- timeshift(header, header$first_sample, c('starttime','endtime')) #shift by those times
+
+  #now get a table of IDs and first_sample for shifting everything else
+  firsts <- dplyr::distinct_(header,.dots=c(obj$idvar,'first_sample'))
+
+  #loop through all the tables
+  for(tbl in c('fixations','saccades','blinks','messages')){
+
+    tmp <- alldata[[tbl]]
+    tmp$rownum <- 1:nrow(tmp) #this is so we can re-order it easily
+
+    tmp <- dplyr::left_join(tmp,firsts,by=obj$idvar) #merge with the firsts table
+    tmp <- dplyr::arrange(tmp,rownum) #order it back to original
+    tmp <- dplyr::select(tmp,-rownum) #throw away our order variable
+
+    if(tbl=='messages')
+      vars_to_shift = 'sttime'
+    else
+      vars_to_shift = c('sttime','entime')
+
+    #time-shift the appropriate columns
+    obj[[tbl]] <- timeshift(alldata[[tbl]],tmp$first_sample,vars_to_shift)
+
+  }
+
+
 
 #   if(samples)
 #     {
