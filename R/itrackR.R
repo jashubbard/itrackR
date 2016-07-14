@@ -72,6 +72,8 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 
     obj$edfs <- unlist(lapply(obj$edfs,make_fullpath))
 
+
+  obj$subs <- edf2id(obj$edfs)
   return(obj)
 
 }

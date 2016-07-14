@@ -21,7 +21,8 @@ Imports:
     spatstat,
     knitr,
     R.utils,
-    pracma
+    pracma,
+    lazyeval
 Depends:
     foreach,
     magrittr,
