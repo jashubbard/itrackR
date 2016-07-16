@@ -122,7 +122,7 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
 
     facetexp <- paste(rowexp,colexp,sep=" ~ ")
 
-    plt <- plt + ggplot2::facet_grid(facetexp)
+    plt <- plt + ggplot2::facet_grid(facetexp,labeller = label_both)
   }
 
   plt <- plt + ggplot2::theme(panel.background = ggplot2::element_blank(),

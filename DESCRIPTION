@@ -8,7 +8,7 @@ Maintainer: Jason Hubbard <hubbard3@uoregon.edu>
 Description: A package for high-level analyses of eyetracking data
 License: GPL
 LazyData: TRUE
-Imports: 
+Imports:
     doParallel,
     foreach,
     iterators,
@@ -21,12 +21,12 @@ Imports:
     spatstat,
     knitr,
     R.utils,
-    pracma
-Depends: 
+    pracma,
+    lazyeval,
     foreach,
     magrittr,
     data.table
-Suggests: 
+Suggests:
     rmarkdown,
     testthat
 VignetteBuilder: knitr

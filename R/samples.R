@@ -1,9 +1,12 @@
-epoch_samples <- function(obj,timevar,field='pa',epoch=c(-100,100))
+epoch_samples <- function(obj,event,field='pa',epoch=c(-100,100))
 {
 
   obj <- check_for_samples(obj) #if we haven't loaded sample data yet, this will do it
 
   # allepochs <- list()
+
+  if(!(event %in% names(obj$header)))
+    stop("Time-locking event not found. Have you run find_messages yet?")
 
   for(i in 1:length(obj$edfs))
   {
@@ -11,26 +14,26 @@ epoch_samples <- function(obj,timevar,field='pa',epoch=c(-100,100))
     #     justfile <- sub("^([^.]*).*", "\\1", basename(obj$edfs[[i]]))
     #     id <- as.numeric(gsub("([0-9]*).*","\\1",justfile))
 
-    id <- edf2id(obj$edfs[[i]])
+    id <- edf$subs[[i]]
 
     header <- subset(obj$header,ID==id)
-    events <- header[[timevar]][!is.na(header[[timevar]])]
-    trials <- header$eyetrial[!is.na(header[[timevar]])]
+    events <- header[[event]][!is.na(header[[event]])]
+    trials <- header$eyetrial[!is.na(header[[event]])]
     samples <- readRDS(obj$samples[[i]])
 
     thisepoch <- edfR::epoch.samples(events,as.data.frame(samples),sample.field=field,epoch=epoch,eyetrial=T)
 
     thisepoch$ID <- rep(id,length(trials))
-    thisepoch$event <- timevar
+    thisepoch$event <- event
     thisepoch$eyetrial <- trials
-    obj$epochs$samples[[timevar]][[i]] <- thisepoch
+    obj$epochs$samples[[event]][[i]] <- thisepoch
 
     rm(samples)
     gc()
 
   }
 
-  # obj$epochs[[timevar]] <- allepochs
+  # obj$epochs[[event]] <- allepochs
 
 
   return(obj)
@@ -41,8 +44,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
 
 
   allsamps <- list()
-  samps <- data.table::data.table()
-  alldata <- list()
+
 
   #check for directory to save .rds files into
   if(!is.null(outdir))
@@ -83,17 +85,14 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
 
   }
 
-  rm(alldata)
-  rm(samps)
-
-
 
   obj$samples <- allsamps
+  print("complete")
   return(obj)
 
 }
 
-load_sample_file <- function(obj,edf,force=F){
+load_sample_file <- function(obj,edf,force=FALSE){
 
    id <- edf2id(edf)
    fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
@@ -102,19 +101,25 @@ load_sample_file <- function(obj,edf,force=F){
     samps <- readRDS(fname)
   else{
     samps <- edfR::edf.samples(edf,trials=T,eventmask=T)
-    baseline <- obj$header$starttime[1]
-    # samps <- timeshift(samps,baseline,'time')
 
-    if(all(is.na(samps$paL))){
-      samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
-      data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
 
-    } else{
+    #if it's not binocular, don't keep all the L/R data
+    if(!obj$binocular){
+      if(all(is.na(samps$paL))){
+        samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
+        data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
 
-      samps[,(c("paR","gxR","gyR")) :=NULL]
-      data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
+      } else{
 
+        samps[,(c("paR","gxR","gyR")) :=NULL]
+        data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
+
+      }
     }
+
+    #time-shift
+    baseline <- samps[1,time]-1
+    samps[,time := time-baseline]
 
     saveRDS(samps,fname,compress = T)
   }
@@ -223,7 +228,10 @@ get_all_epochs <- function(obj,epochname,baseline=NULL,baseline.method='percent'
     epochs$timepoint <- as.numeric(gsub('_','-',epochs$timepoint))
   }
 
-  if(!is.null(beh))
+  if(nrow(obj$beh)==0)
+    warning('No behavioral data was found. If you want to include it, run add_behdata')
+
+  if(!is.null(beh) && nrow(obj$beh)>0)
   {
 
     if(beh[1]=='all' || (is.logical(beh) && beh==TRUE))
