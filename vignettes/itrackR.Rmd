@@ -243,6 +243,6 @@ plot.timeseries(z,event='STIMONSET',rois=c('target','distractor'),lines=c('roi',
 
 #plot difference waves (target - distractor fixations). Plot on separate rows insetead of columns.
 #This example doesn't make much sense because distractors aren't present on no-conflict trials
-plot.timeseries(z,event='STIMONSET',rois=c('target','distractor'),lines=c('roi','Conflict'),rows='Task',difference=T)
+plot.timeseries(z,event='STIMONSET',rois=c('target','distractor'),lines=c('Conflict'),rows='Task',type='difference')
 
 ```

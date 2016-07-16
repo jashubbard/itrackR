@@ -386,7 +386,7 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
     }
 
     #one_of to use character vectors here (unfortunately not possible with group_by)
-    agg <- dplyr::select(agg,ID,one_of(groupvars),bin,val,epoch_start,epoch_end,binwidth)
+    agg <- dplyr::select(agg,ID,dplyr::one_of(groupvars),bin,val,epoch_start,epoch_end,binwidth)
 
     if(level=='group'){
       #apparently dplyr does not like character vectors (groupvars) and 'static' column names. this is the workaround:
@@ -407,7 +407,7 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
                                               level=level,
                                               filter = filter)
 
-      agg <- rbind(agg,aggtmp)
+      agg <- rbind(agg,dplyr::ungroup(aggtmp))
     }
   }
 
