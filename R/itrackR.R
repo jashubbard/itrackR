@@ -205,7 +205,7 @@ add_behdata <- function(obj,beh,append=FALSE){
 
     eyedata <- obj$header[c('ID','eyetrial',obj$indexvars)]
 #~     eyedata <- cbind(eyedata,obj$header[obj$timevars] - obj$header$starttime)
-    eyedata <- cbind(eyedata,obj$header$starttime)
+    eyedata <- cbind(eyedata,obj$header['starttime'])
 
     behmerged <- merge(beh,eyedata,by=c('ID',obj$indexvars),all.x=T)
     obj$beh <- behmerged
