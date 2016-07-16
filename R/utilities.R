@@ -418,15 +418,11 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
                                               level=level,
                                               filter = filter)
 
-<<<<<<< HEAD
-      agg <- rbind(agg,dplyr::ungroup(aggtmp))
-=======
 
       if(nrow(agg)==0)
         agg <- aggtmp
       else
         agg <- rbind(agg,aggtmp)
->>>>>>> 8beb922d022be22e50c411ce1fb639682b75b13a
     }
   }
 
@@ -504,7 +500,7 @@ detect.saccades <- function(samples, lambda=15, smooth.saccades=T) {
 itrackR.data <- function(data){
 
   #get path to data folder
-  d <- paste0(system.file('data', package='itrackR'), .Platform$file.sep)
+  d <- paste0(system.file('inst', package='itrackR'), .Platform$file.sep,'extdata')
 
   #find all edfs, get full path of each
   edfs <-  list.files(path=d,'*.edf')
