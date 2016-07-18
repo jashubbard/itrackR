@@ -95,7 +95,7 @@ calcHits_saccades <- function(obj,rois='all',append=FALSE){
   return(obj)
 }
 
-mapROIs <- function(obj,names,indicators=NULL){
+mapROIs <- function(obj,names,indicators=NULL,cleanup=FALSE){
 
   newnames <- names
   startnames <- newnames
@@ -123,7 +123,7 @@ mapROIs <- function(obj,names,indicators=NULL){
     tmp1 <- obj$beh[,c('ID','eyetrial',indicators)] #behavioral data with trial-by-trial indicators
     #tmp1[,indicators] <- as.numeric(tmp1[, indicators]) # if indicators are factors convert them here to numbers
     tmp2 <- obj[[eyedata]][,c('ID','eyetrial',keyvar,roivars)] #fixation data with roi hits
-    tmp3 <- merge(tmp1,tmp2,by=c('ID','eyetrial'),all.y=T) #merge them together so we have our indicators for fixation-by-fixation
+    tmp3 <- dplyr::right_join(tmp1,tmp2,by=c('ID','eyetrial')) #merge them together so we have our indicators for fixation-by-fixation
     tmp3 <- dplyr::arrange_(tmp3,keyvar) #put in the original order
     hits <- tmp3[,roivars] #grab only the hit data (since we will use the indicator to index from this)
 
@@ -170,10 +170,11 @@ mapROIs <- function(obj,names,indicators=NULL){
     }
 
     #merge our existing fixation data with our new mapped data
-    obj[[eyedata]] <- merge(obj[[eyedata]],tmp3[,c(keyvar,indicators,newnames)],by=keyvar,all.x=T)
+    obj[[eyedata]] <- dplyr::left_join(obj[[eyedata]],tmp3[,c(keyvar,indicators,newnames)],by=keyvar)
 
     # delete the hit columns to free memory
-    obj[[eyedata]][, c(roivars)] <- list(NULL)
+    if(cleanup)
+      obj[[eyedata]][, c(roivars)] <- list(NULL)
     # trigger garbage collection:
     gc()
   }

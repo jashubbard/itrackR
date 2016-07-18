@@ -83,7 +83,14 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
   tmp$bin <- gsub('t','',tmp$bin)
   tmp$bin <- as.numeric(gsub('_','-',tmp$bin))
   tmp$bin <- (tmp$bin)*tmp$binwidth
-  tmp$lines <- interaction(agg[,lines])
+
+  if('roi' %in% lines)
+    plotlines <- lines[-which('roi' %in% lines)]
+  else
+    plotlines <- lines
+
+
+  tmp$lines <- interaction(agg[,plotlines])
 
   if(!is.null(rows)){
     tmp$rows <- interaction(agg[,rows])
@@ -95,9 +102,11 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
     colexp <- do.call('paste',c(as.list(cols),sep=' + '))
   }
 
-  plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=lines,color=lines))+
+
+
+  plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=interaction(roi,lines),color=lines,shape=roi,linetype=roi))+
     ggplot2::geom_line() + #size=.75) +
-    ggplot2::geom_point(size=1.5) +
+    ggplot2::geom_point(size=1.8) +
     ggplot2::xlab('time (ms)') +
     ggplot2::geom_vline(ggplot2::aes(xintercept = 0), alpha=0.5, linetype='dashed') +
     ggplot2::scale_color_discrete(name = toString(lines)) +
