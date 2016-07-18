@@ -22,12 +22,12 @@ Imports:
     knitr,
     R.utils,
     pracma,
-    lazyeval
-Depends:
+    lazyeval,
     foreach,
     magrittr,
     data.table
 Suggests:
-    rmarkdown
+    rmarkdown,
+    testthat
 VignetteBuilder: knitr
 RoxygenNote: 5.0.1

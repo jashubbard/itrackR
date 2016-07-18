@@ -406,7 +406,6 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
       agg$val <- agg$val.x / agg$val.y
     }
 
-
     #select only the variables we want
     agg <- dplyr::select_(agg, .dots= c('ID',groupvars,'bin','val','epoch_start','epoch_end','binwidth'))
 
@@ -511,7 +510,7 @@ detect.saccades <- function(samples, lambda=15, smooth.saccades=T) {
 itrackR.data <- function(data){
 
   #get path to data folder
-  d <- paste0(system.file('data', package='itrackR'), .Platform$file.sep)
+  d <- paste0(system.file('inst', package='itrackR'), .Platform$file.sep,'extdata')
 
   #find all edfs, get full path of each
   edfs <-  list.files(path=d,'*.edf')
