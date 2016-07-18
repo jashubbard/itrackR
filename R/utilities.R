@@ -510,7 +510,7 @@ detect.saccades <- function(samples, lambda=15, smooth.saccades=T) {
 itrackR.data <- function(data){
 
   #get path to data folder
-  d <- paste0(system.file('inst', package='itrackR'), .Platform$file.sep,'extdata')
+  d <- paste0(system.file('extdata', package='itrackR'), .Platform$file.sep)
 
   #find all edfs, get full path of each
   edfs <-  list.files(path=d,'*.edf')
