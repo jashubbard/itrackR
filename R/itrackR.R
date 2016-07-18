@@ -205,7 +205,7 @@ add_behdata <- function(obj,beh,append=FALSE){
 
     eyedata <- obj$header[c('ID','eyetrial',obj$indexvars)]
 #~     eyedata <- cbind(eyedata,obj$header[obj$timevars] - obj$header$starttime)
-    eyedata <- cbind(eyedata,obj$header$starttime)
+    eyedata <- cbind(eyedata,obj$header['starttime'])
 
     behmerged <- merge(beh,eyedata,by=c('ID',obj$indexvars),all.x=T)
     obj$beh <- behmerged
@@ -301,7 +301,7 @@ makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius
 }
 
 
-eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL,roi=NULL,trialtime = TRUE){
+eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL,roi=NULL,trialtime = TRUE,condition=NULL,condition.str=FALSE){
 
   #if we're getting epoched fixation data, we already have what we need, just need to grab the right variables, etc.
   if(eyedata=='epoched_fixations'){
@@ -314,20 +314,18 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
 
     realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars))
 
-    if(behdata[1] !='all'){
-      beh_to_keep <- intersect(behdata,realbehvars)
-#~       print(beh_to_keep)
-    }
+    if(behdata[1] !='all')
+      behvars <- intersect(behdata,realbehvars)
     else
-      beh_to_keep <- intersect(colnames(beh),realbehvars)
+      behvars <- intersect(colnames(beh),realbehvars)
 
     timevars <- names(eyes)[grepl('^t[1-9]',names(eyes))]
 
-    output <- dplyr::right_join(beh[c('ID','eyetrial',obj$indexvars,beh_to_keep)],eyes,by=c('ID','eyetrial',obj$indexvars))
-    output <- dplyr::arrange(output,ID,eyetrial)
+    eyevars <- c('ID','eyetrial',obj$indexvars,'roi','epoch_start','epoch_end','binwidth','sttime','entime',paste0(roi,'_hit'),timevars)
+    eyes <- eyes[eyevars]
 
-    # eye_to_keep <- c('ID','eyetrial',obj$indexvars,beh_to_keep,'roi','epoch_start','epoch_end','binwidth','sttime','entime',paste0(roi,'_hit'),timevars)
-    #eyes <- eyes[eye_to_keep]
+    output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial',obj$indexvars))
+    output <- dplyr::arrange(output,ID,eyetrial)
   }
   else{
 
@@ -336,7 +334,7 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     beh <- obj$beh
 
     #add trial header information
-    beh <- dplyr::left_join(beh,obj$header[c('ID','eyetrial','starttime')], by=c('ID','eyetrial'))
+    # beh <- dplyr::left_join(beh,obj$header[c('ID','eyetrial','starttime')], by=c('ID','eyetrial'))
 
 
     #remove the roi_1, roi_2, ... columns
@@ -344,9 +342,16 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
       eyes <- dplyr::select(eyes,-matches("^roi_*"))
     }
 
-    #if we want only some of the behavioral variables
-    if(behdata[1] !='all')
-      beh <- dplyr::select_(beh,.dots=unique(c('ID','eyetrial','starttime',obj$indexvars,behdata)))
+    # #if we want only some of the behavioral variables
+    # if(behdata[1] !='all')
+    #   beh <- dplyr::select_(beh,.dots=unique(c('ID','eyetrial','starttime',obj$indexvars,behdata)))
+
+    if(behdata[1]=='all')
+      behvars <- names(beh)
+    else{
+      realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars))
+      behvars <- intersect(colnames(beh),realbehvars)
+    }
 
     #in case there are variable names in common between eyedata and behdata, besides index variables
     #remove them from eyedata
@@ -354,7 +359,8 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     commonvars <- intersect(realvars,colnames(beh))
 
     if(length(commonvars)>0)
-      eyes <- eyes[!(colnames(eyes) %in% commonvars)]
+      eyevars <- names(eyes)[!(colnames(eyes) %in% commonvars)]
+      eyes <- eyes[eyevars]
 
     #merge behavioral and eye data
     output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
@@ -369,6 +375,21 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
       output$entime <- output$entime - output$trialsttime
     }
   }
+
+  #filter out data based on some condition
+  if(!condition.str)
+    condition <- deparse(substitute(condition))
+
+   if(condition!="NULL"){
+    condition_call <- parse(text=condition)
+    r <- eval(condition_call,output, parent.frame())
+    output <- output[r, ]
+}
+
+  #keep only some behavioral variables
+  if(behdata[1]!='all')
+    output <- dplyr::select_(output, .dots=unique(c('ID','eyetrial',behvars,names(eyes))))
+
 
   return(output)
 }

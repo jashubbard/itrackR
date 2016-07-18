@@ -298,26 +298,33 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL,type=
   return(obj)
 }
 
-do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='long',filter=NULL){
+do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='long',condition="NULL"){
 
   prefix <- 't'
 
   # df <- obj$epochs$fixations[[event]][[roi]]
 
-  df <- eyemerge(obj,'epoched_fixations',behdata=unique(c(groupvars,filter[1])),event=event,roi=roi)
+  df <- eyemerge(obj,'epoched_fixations',behdata=groupvars,event=event,roi=roi,condition=condition,condition.str=T)
 
   # remove unneccesary columns to save memory
-  df <- dplyr::select(df, c(-fixation_key, -sttime, -entime, -bin_start, -bin_end)) #, -epoch_start, -epoch_end, -binwidth))
+  # df <- dplyr::select(df, c(-fixation_key, -sttime, -entime, -bin_start, -bin_end)) #, -epoch_start, -epoch_end, -binwidth))
 
   #remove specified filters: filter[1] == column name, filter[2] == condition (e.g., preposition == 'above')
-  if(!is.null(filter)){
-    var = filter[1]
-    val = filter[2]
-    filter_criteria <- lazyeval::interp(~ which_column == val, which_column = as.name(var))
-    df <- dplyr::filter_(df,filter_criteria)
+  # if(!is.null(filter)){
+    # var = filter[1]
+    # val = filter[2]
+    # filter_criteria <- lazyeval::interp(~ which_column == val, which_column = as.name(var))
+    # df <- dplyr::filter_(df,filter_criteria)
 
     # df <-df[eval(parse(text=paste0("df$",filter[1]))) == filter[2], ]
-  }
+  # if(condition!="NULL"){
+  #   condition_call <- parse(text=condition)
+  #   r <- eval(condition_call,df, parent.frame())
+  #   df <- df[r, ]
+  # }
+  # # }
+
+
 
   epoch_start <- df$epoch_start[1]
   epoch_end <- df$epoch_end[1]
@@ -360,9 +367,12 @@ do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='lo
   return(dplyr::ungroup(df))
 }
 
-aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',type='probability',filter=NULL){
+aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',type='probability',condition=NULL,condition.str=FALSE){
 
   agg <- data.frame()
+
+  if(!condition.str)
+    condition <- deparse(substitute(condition))
 
   if((type != 'probability') && length(rois==2)){
 
@@ -370,13 +380,13 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
       stop('Using "roi" as a grouping variable does not work if you want to plot a contrast score.')
     }
 
-    aggID_one <- aggregate_fixation_timeseries(obj,event=event,roi=rois[1],groupvars = groupvars,shape='long',level='ID',filter=filter)
-    aggID_two <- aggregate_fixation_timeseries(obj,event=event,roi=rois[2],groupvars = groupvars,shape='long',level='ID',filter=filter)
+    aggID_one <- aggregate_fixation_timeseries(obj,event=event,roi=rois[1],groupvars = groupvars,shape='long',level='ID',condition=condition,condition.str=T)
+    aggID_two <- aggregate_fixation_timeseries(obj,event=event,roi=rois[2],groupvars = groupvars,shape='long',level='ID',condition=condition, condition.str=T)
 
     # force garbage collection:
     gc()
 
-    agg <- merge(aggID_one,aggID_two,by=c('ID',groupvars,'bin'))
+    agg <- dplyr::inner_join(aggID_one,aggID_two,by=c('ID',groupvars,'bin'))
 
     if( ( (!all(agg$binwidth.x==agg$binwidth.y)) || (!all(agg$epoch_start.x==agg$epoch_start.y)) || (!all(agg$epoch_end.x==agg$epoch_end.y)) ))
       stop('Epochs/binning is different for the different ROIs. Data will not match up')
@@ -396,13 +406,14 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
       agg$val <- agg$val.x / agg$val.y
     }
 
-    #one_of to use character vectors here (unfortunately not possible with group_by)
-    agg <- dplyr::select(agg,ID,one_of(groupvars),bin,val,epoch_start,epoch_end,binwidth)
+
+    #select only the variables we want
+    agg <- dplyr::select_(agg, .dots= c('ID',groupvars,'bin','val','epoch_start','epoch_end','binwidth'))
 
     if(level=='group'){
-      #apparently dplyr does not like character vectors (groupvars) and 'static' column names. this is the workaround:
-      tmpvars = sapply(c('bin','epoch_start','epoch_end','binwidth',groupvars), . %>% {as.formula(paste0('~', .))})
-      agg <- dplyr::group_by_(agg,.dots=tmpvars) %>%
+      #group_by using string variable names
+      dots <- lapply(c('bin','epoch_start','epoch_end','binwidth',groupvars), as.symbol)
+      agg <- dplyr::group_by_(agg,.dots=dots) %>%
         dplyr::summarise(val = mean(val,na.rm=T))
     }
 
@@ -416,7 +427,7 @@ aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='gr
                                               groupvars = groupvars,
                                               shape=shape,
                                               level=level,
-                                              filter = filter)
+                                              condition=condition)
 
 
       if(nrow(agg)==0)

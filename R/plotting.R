@@ -59,11 +59,13 @@ plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,whichROIs='all
   return(p)
 }
 
-plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level='group',type='probability',filter=NULL){
+plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level='group',type='probability',condition=NULL){
 
   if(is.null(event)){
     event = 'default_event'
   }
+
+  condition <- deparse(substitute(condition))
 
   agg <- aggregate_fixation_timeseries(obj,event=event,
                                        rois=rois,
@@ -71,7 +73,8 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
                                        shape='long',
                                        level=level,
                                        type=type,
-                                       filter=filter)
+                                       condition=condition,
+                                       condition.str = T)
 
   mainvars <- c('bin','val','roi','epoch_start','epoch_end','binwidth')
   othervars <- names(agg)[-which(names(agg) %in% mainvars)]
@@ -122,7 +125,7 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
 
     facetexp <- paste(rowexp,colexp,sep=" ~ ")
 
-    plt <- plt + ggplot2::facet_grid(facetexp,labeller = label_both)
+    plt <- plt + ggplot2::facet_grid(facetexp,labeller = ggplot2::label_both)
   }
 
   plt <- plt + ggplot2::theme(panel.background = ggplot2::element_blank(),
