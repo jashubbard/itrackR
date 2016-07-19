@@ -333,6 +333,15 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     eyes <- obj[[eyedata]]
     beh <- obj$beh
 
+    hdr <- obj$header
+
+    #we want some info from the header. Only any events that we found.
+    hdr_vars <- names(hdr)[-which(names(hdr) %in% c('starttime','endtime','duration','first_sample', obj$indexvars))]
+
+    if(length(hdr_vars)>0){
+      hdr <- hdr[hdr_vars]
+      beh <- dplyr::left_join(beh,hdr,by=c('ID','eyetrial'))
+    }
     #add trial header information
     # beh <- dplyr::left_join(beh,obj$header[c('ID','eyetrial','starttime')], by=c('ID','eyetrial'))
 
