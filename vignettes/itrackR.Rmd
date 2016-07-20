@@ -19,7 +19,7 @@ Some sample data is included with itrackR. This includes 2 EDF files from an SR-
 ```{r,results="hide",message=FALSE}
 library(itrackR)
 datapath <- itrackR.data('path')
-edfs <- itrackR.data('edfs')
+edf_files <- itrackR.data('edfs')
 beh <- itrackR.data('beh')
 
 ```
@@ -33,7 +33,7 @@ datapath
 `edfs` is a list of the 2 edfs found in that folder:
 
 ```{r}
-edfs
+edf_files
 ```
 
 `beh` is a data frame of the behavioral data for the same 2 subjects.
@@ -47,7 +47,7 @@ knitr::kable(head(beh, 10))
 We start by initializing the itrackR object and loading the data. This can be done in a couple different ways. If we have a list of all edf files (in the current working directory, or with full path names) we can do it like this.
 
 ```{r}
-z <- itrackr(edfs=edfs)
+z <- itrackr(edfs=edf_files)
 
 #Alternatively, we can provide the path and a search pattern to find all edfs in a certain folder:
 #z <- itrackr(path=datapath, pattern='*.edf')

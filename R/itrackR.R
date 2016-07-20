@@ -1,5 +1,5 @@
 #class constructor
-itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern=NULL,resolution=c(1024,768),datadir=tempdir(),binocular=FALSE)
+itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern='*.edf',resolution=c(1024,768),datadir=tempdir(),binocular=FALSE)
 {
 
   me <- list(
