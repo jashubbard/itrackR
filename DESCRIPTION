@@ -12,7 +12,6 @@ Imports:
     doParallel,
     foreach,
     iterators,
-    edfR,
     data.table,
     magrittr,
     ggplot2,
@@ -29,5 +28,7 @@ Imports:
 Suggests:
     rmarkdown,
     testthat
+Remotes:
+    jashubbard/edfR
 VignetteBuilder: knitr
 RoxygenNote: 5.0.1
