@@ -37,9 +37,19 @@ test_that("epoching samples", {
   expect_match(names(z$epochs$samples)[[1]],'STIMONSET')
   expect_equal(length(z$epochs$samples$STIMONSET),1)
   expect_is(z$epochs$samples$STIMONSET[[1]]$epochs,'matrix')
-  expect_equal(dim(z$epochs$samples$STIMONSET[[1]]$epochs),c(1320,1000))
+  expect_equal(ncol(z$epochs$samples$STIMONSET[[1]]$epochs),1000)
   expect_gt(var(z$epochs$samples$STIMONSET[[1]]$epochs[100,],na.rm=T),0)
-  # allepochs <- get_all_epochs(z,'STIMONSET',shape='wide',baseline=NULL,beh=T)
+
+
+  expect_warning(allepochs <- get_all_epochs(z,'STIMONSET',shape='wide',baseline=NULL,beh=T))
+
+  expect_is(allepochs,'data.frame')
+  expect_equal(ncol(allepochs),1002)
+
+  check1 <- z$epochs$samples$STIMONSET[[1]]$epochs
+  check2 <- allepochs[1:nrow(check1), 3:ncol(allepochs)]
+
+  expect_true(all(check1==check2))
 
 
 })
