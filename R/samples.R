@@ -14,7 +14,7 @@ epoch_samples <- function(obj,event,field='pa',epoch=c(-100,100))
     #     justfile <- sub("^([^.]*).*", "\\1", basename(obj$edfs[[i]]))
     #     id <- as.numeric(gsub("([0-9]*).*","\\1",justfile))
 
-    id <- edf$subs[[i]]
+    id <- obj$subs[[i]]
 
     header <- subset(obj$header,ID==id)
     events <- header[[event]][!is.na(header[[event]])]
