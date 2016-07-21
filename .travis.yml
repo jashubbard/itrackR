@@ -16,5 +16,5 @@ before_install:
  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install edfapi-3.1; fi
 
  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then curl -L -o ~/eyelink.mpkg "https://www.dropbox.com/sh/ajdg7aabu8awavv/AACn0UlNwY1MPjisdgn5JE36a?dl=1"; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then  sudo installer ~/eyelink.mpkg -target / ; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then  sudo installer -pkg ~/eyelink.mpkg -target / ; fi
 
