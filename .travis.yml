@@ -15,7 +15,7 @@ before_install:
  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update; fi
  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get install edfapi-3.1; fi
 
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then curl -L -o eyelink.mpkg.zip "https://www.dropbox.com/s/m5p3841eoh82kgg/EyelinkDisplayAPI_1.11.1.mpkg.zip?dl=1""; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then curl -L -o eyelink.mpkg.zip "https://www.dropbox.com/s/m5p3841eoh82kgg/EyelinkDisplayAPI_1.11.1.mpkg.zip?dl=1"; fi
  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then unzip eyelink.mpkg.zip; fi
- - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then sudo installer -pkg "EyelinkDisplayAPI_1.11.1.mpkg"" -target / ; fi
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then sudo installer -pkg "EyelinkDisplayAPI_1.11.1.mpkg" -target / ; fi
 
