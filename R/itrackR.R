@@ -303,6 +303,9 @@ makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius
 
 eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL,roi=NULL,trialtime = TRUE,condition=NULL,condition.str=FALSE){
 
+  if(length(obj$beh)==0)
+    stop('No behavioral data has been added. Did you run add_behdata?')
+
   #if we're getting epoched fixation data, we already have what we need, just need to grab the right variables, etc.
   if(eyedata=='epoched_fixations'){
 
@@ -367,10 +370,10 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     realvars <- setdiff(colnames(eyes),c('ID','eyetrial','starttime',obj$indexvars))
     commonvars <- intersect(realvars,colnames(beh))
 
-    if(length(commonvars)>0)
+    if(length(commonvars)>0){
       eyevars <- names(eyes)[!(colnames(eyes) %in% commonvars)]
       eyes <- eyes[eyevars]
-
+    }
     #merge behavioral and eye data
     output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
     output <- dplyr::arrange(output,ID,eyetrial)
