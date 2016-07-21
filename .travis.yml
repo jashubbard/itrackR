@@ -1,12 +1,9 @@
 language: r
 cache: packages
-
-
-
-cache: packages
-
 sudo:
   required
+
+warnings_are_errors: false
 
 before_install:
  - wget http://download.sr-support.com/software/sr-research-public-key -O ~/sr.key
