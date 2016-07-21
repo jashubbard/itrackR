@@ -24,7 +24,8 @@ Imports:
     lazyeval,
     foreach,
     magrittr,
-    data.table
+    data.table,
+    edfR
 Suggests:
     rmarkdown,
     testthat
