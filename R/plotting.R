@@ -3,7 +3,7 @@
 #
 # }
 
-plot.itrackR <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0){
+plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0){
 
   if (length(IDs) != 0) {
     obj$fixations = subset(obj$fixations, ID %in% IDs)

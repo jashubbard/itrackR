@@ -351,7 +351,7 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
 
     #remove the roi_1, roi_2, ... columns
     if(!all.rois && any(grepl('^roi_*',colnames(eyes)))){
-      eyes <- dplyr::select(eyes,-matches("^roi_*"))
+      eyes <- dplyr::select(eyes,-dplyr::matches("^roi_*"))
     }
 
     # #if we want only some of the behavioral variables
@@ -361,8 +361,10 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     if(behdata[1]=='all')
       behvars <- names(beh)
     else{
-      realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars))
-      behvars <- intersect(colnames(beh),realbehvars)
+      # realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars))
+      # behvars <- intersect(colnames(beh),realbehvars)
+
+      behvars <- unique(c('ID','eyetrial',obj$indexvars,behdata))
     }
 
     #in case there are variable names in common between eyedata and behdata, besides index variables
@@ -378,16 +380,15 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
     output <- dplyr::arrange(output,ID,eyetrial)
 
-    output <- dplyr::rename(output,
-                           trialsttime = starttime)
+
 
     #by default, change starting and endind times of fixations relative to trial start
     if(trialtime){
-      output$sttime <- output$sttime - output$trialsttime
-      output$entime <- output$entime - output$trialsttime
+      output$sttime <- output$sttime - output$starttime
+      output$entime <- output$entime - output$starttime
 
       if(length(event_vars)>0)
-        output[event_vars] <- output[event_vars] - output$trialsttime
+        output[event_vars] <- output[event_vars] - output$starttime
 
     }
   }
@@ -404,8 +405,11 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
 
   #keep only some behavioral variables
   if(behdata[1]!='all')
-    output <- dplyr::select_(output, .dots=unique(c('ID','eyetrial',behvars,names(eyes))))
+    output <- dplyr::select_(output, .dots=unique(c('ID','eyetrial',obj$indexvars,behvars,'starttime',names(eyes))))
 
+  #to make things less confusing
+  output <- dplyr::rename(output,
+                          trialsttime = starttime)
 
   return(output)
 }
@@ -416,7 +420,7 @@ drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
 
   fixdata <- eyemerge(obj,behdata=unique(c('ID','eyetrial',vars)),trialtime=FALSE)
 
-  fixdata <- dplyr::group_by_(fixdata,.dots=vars)
+  fixdata <- dplyr::group_by_(fixdata,.dots=unique('ID',vars))
   fixdata <- dplyr::mutate(fixdata,
                               center_x = median(gavx,na.rm=T),
                               center_y = median(gavy,na.rm=T))

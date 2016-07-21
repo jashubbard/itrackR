@@ -196,7 +196,7 @@ ind2sub <- function(mat,ind){
   return(list(row=r,col=c))
 }
 
-epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL,type=NULL){
+epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL,type='standard'){
 
   startvar <- 'sttime'
   endvar <- 'entime'
