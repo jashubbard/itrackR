@@ -88,7 +88,7 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
   tmp$bin <- as.numeric(gsub('_','-',tmp$bin))
   tmp$bin <- (tmp$bin)*tmp$binwidth
 
-  if('roi' %in% lines)
+  if(('roi' %in% lines) && (length(lines)>1))
     plotlines <- lines[-which('roi' %in% lines)]
   else
     plotlines <- lines
