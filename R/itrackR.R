@@ -322,7 +322,7 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     else
       behvars <- intersect(colnames(beh),realbehvars)
 
-    timevars <- names(eyes)[grepl('^t[1-9]',names(eyes))]
+    timevars <- names(eyes)[grepl('^t[_1-9]',names(eyes))]
 
     eyevars <- c('ID','eyetrial',obj$indexvars,'roi','epoch_start','epoch_end','binwidth','sttime','entime',paste0(roi,'_hit'),timevars)
     eyes <- eyes[eyevars]
