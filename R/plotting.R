@@ -3,11 +3,15 @@
 #
 # }
 
-plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0){
+plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0,quick=F){
 
-  if (length(IDs) != 0) {
-    obj$fixations = subset(obj$fixations, ID %in% IDs)
-  }
+  if (length(IDs) != 0)
+    fixdata = subset(obj$fixations, ID %in% IDs)
+  else
+    fixdata = obj$fixations
+
+  if(quick)
+    fixdata <- dplyr::distinct(dplyr::select_(fixdata,.dots=c(obj$idvar,'gavx','gavy')))
 
   if(rois && !is.null(obj$rois)){
     df <- rois2df(obj)
@@ -19,9 +23,9 @@ plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all'
       ggplot2::geom_polygon(data=df, ggplot2::aes(x=x,y=y,group=name),fill='gray',alpha=0.5)
 
     if(summarize > 0){
-      p <- p + ggplot2::stat_bin2d(data=obj$fixations,ggplot2::aes(x=gavx,y=gavy, size = ..count..), color='yellow',bins = summarize, geom = "point")
+      p <- p + ggplot2::stat_bin2d(data=fixdata,ggplot2::aes(x=gavx,y=gavy, size = ..count..), color='yellow',bins = summarize, geom = "point")
     } else {
-      p <- p + ggplot2::geom_point(data=obj$fixations,ggplot2::aes(x=gavx,y=gavy),color='yellow',size=0.7)
+      p <- p + ggplot2::geom_point(data=fixdata,ggplot2::aes(x=gavx,y=gavy),color='yellow',size=0.7)
     }
 
     if(names)
@@ -29,16 +33,16 @@ plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all'
   }
   else{
      if(summarize > 0){
-      p <- ggplot2::ggplot(obj$fixations,ggplot2::aes(x=gavx,y=gavy)) + ggplot2::stat_bin2d(bins = summarize, ggplot2::aes(size = ..count..), color = 'yellow', geom = "point")
+      p <- ggplot2::ggplot(fixdata,ggplot2::aes(x=gavx,y=gavy)) + ggplot2::stat_bin2d(bins = summarize, ggplot2::aes(size = ..count..), color = 'yellow', geom = "point")
     } else {
-      p <- ggplot2::ggplot(obj$fixations,ggplot2::aes(x=gavx,y=gavy)) + ggplot2::geom_point(color='yellow',size=0.7)
+      p <- ggplot2::ggplot(fixdata,ggplot2::aes(x=gavx,y=gavy)) + ggplot2::geom_point(color='yellow',size=0.7)
     }
   }
 
   if(zoom)
     p <- p + ggplot2::coord_cartesian(xlim=c(0,obj$resolution[1]), ylim=c(obj$resolution[2],0))
   else
-    p <- p + ggplot2::coord_cartesian(xlim=c(0,max(obj$fixations$gavx)), ylim=c(max(obj$fixations$gavy),0))
+    p <- p + ggplot2::coord_cartesian(xlim=c(0,max(fixdata$gavx)), ylim=c(max(fixdata$gavy),0))
 
   p <- p + ggplot2::scale_y_reverse() +
     ggplot2::theme(panel.background = ggplot2::element_rect(fill = 'black'),
