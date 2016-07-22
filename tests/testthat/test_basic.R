@@ -9,7 +9,4 @@ test_that("basic tests", {
   expect_equal(length(z$subs),2)
   expect_equal(z$samples,list())
 
-
-
-
 })

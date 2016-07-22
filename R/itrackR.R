@@ -418,13 +418,14 @@ drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
 
   fixnames <- names(obj$fixations)
 
-  fixdata <- eyemerge(obj,behdata=unique(c('ID','eyetrial',vars)),trialtime=FALSE)
+  fixdata <- eyemerge(obj,behdata=unique(c('ID','eyetrial',vars)),trialtime=FALSE) %>%
+    dplyr::arrange(fixation_key)
 
-  fixdata <- dplyr::group_by_(fixdata,.dots=unique('ID',vars))
-  fixdata <- dplyr::mutate(fixdata,
-                              center_x = median(gavx,na.rm=T),
-                              center_y = median(gavy,na.rm=T))
-  fixdata <- dplyr::ungroup(fixdata)
+  fixdata <- dplyr::group_by_(fixdata,.dots=unique(c('ID',vars))) %>%
+    dplyr::mutate(center_x = median(gavx,na.rm=T),
+                  center_y = median(gavy,na.rm=T)) %>%
+    dplyr::ungroup(.)
+
 
   fixdata$real_x <- round(obj$resolution[1]/2)
   fixdata$real_y <- round(obj$resolution[2]/2)
@@ -438,16 +439,36 @@ drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
 
   fixdata$shift_x[abs(fixdata$shift_x)<threshold] <- 0
   fixdata$shift_y[abs(fixdata$shift_y)<threshold] <- 0
+
   fixdata <- dplyr::mutate(fixdata,
                           gavx = gavx - shift_x,
-                          gavy = gavy - shift_y)
+                          gavy = gavy - shift_y) %>%
+    dplyr::arrange(fixation_key)
 
+  obj$fixations$gavx <- fixdata$gavx
+  obj$fixations$gavy <- fixdata$gavy
 
+  obj$transform$fixations <- fixdata[c('ID','eyetrial','fixation_key','shift_x','shift_y')]
 
- obj$fixations <- fixdata[fixnames]
-
- obj$transform$fixations <- fixdata[c('ID','eyetrial','fixation_key','shift_x','shift_y')]
 
 
 return(obj)
+}
+
+
+undrift <- function(obj){
+
+  fixdata <- dplyr::left_join(obj$fixations, obj$transform$fixations,by=c(obj$idvar,'eyetrial','fixation_key'))
+
+  fixdata <- dplyr::mutate(fixdata,
+                           gavx = gavx + shift_x,
+                           gavy = gavy + shift_y) %>%
+    dplyr::arrange(fixation_key)
+
+  obj$fixations <- fixdata[names(obj$fixations)]
+
+  obj$transform$fixations <- NULL
+
+  return(obj)
+
 }
