@@ -30,6 +30,6 @@ Suggests:
     rmarkdown,
     testthat
 Remotes:
-    jashubbard/edfR
+    github::jashubbard/edfR
 VignetteBuilder: knitr
 RoxygenNote: 5.0.1
