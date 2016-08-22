@@ -445,8 +445,15 @@ drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
                           gavy = gavy - shift_y) %>%
     dplyr::arrange(fixation_key)
 
-  obj$fixations$gavx <- fixdata$gavx
-  obj$fixations$gavy <- fixdata$gavy
+
+  #add the new gavx and gavy values
+  #merge so it's robust to weird quirks when calling eyemerge (duplicate rows, etc)
+  obj$fixations <- dplyr::left_join(dplyr::select(obj$fixations,-gavx,-gavy),dplyr::select(fixdata,fixation_key,gavx,gavy),by='fixation_key') %>%
+    dplyr::arrange(fixation_key)
+
+
+  # obj$fixations$gavx <- fixdata$gavx
+  # obj$fixations$gavy <- fixdata$gavy
 
   obj$transform$fixations <- fixdata[c('ID','eyetrial','fixation_key','shift_x','shift_y')]
 
