@@ -3,12 +3,20 @@
 #
 # }
 
-plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0,quick=F){
+plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0,quick=F,condition=NULL){
+
+
+  condition <- deparse(substitute(condition))
+
+  if(condition !='NULL'){
+    fixdata <- eyemerge(obj,condition=condition,condition.str = T)
+  }
+  else
+    fixdata <- obj$fixations
+
 
   if (length(IDs) != 0)
-    fixdata = subset(obj$fixations, ID %in% IDs)
-  else
-    fixdata = obj$fixations
+    fixdata = dplyr::filter(fixdata,ID %in% IDs)
 
   if(quick)
     fixdata <- dplyr::distinct(dplyr::select_(fixdata,.dots=c(obj$idvar,'gavx','gavy')))
