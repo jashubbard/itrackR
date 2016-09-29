@@ -3,7 +3,7 @@
 #
 # }
 
-plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0,quick=F,condition=NULL){
+plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0,quick=F,condition=NULL,oneplot=F){
 
 
   condition <- deparse(substitute(condition))
@@ -63,7 +63,7 @@ plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all'
       ggplot2::geom_vline(xintercept=round(obj$resolution[1]/2),color='red',size=0.3,linetype='dashed')
   }
 
-  if(!summarize){
+  if(!summarize && !oneplot){
     p <- p + ggplot2::facet_wrap(~ID)
   }
 
