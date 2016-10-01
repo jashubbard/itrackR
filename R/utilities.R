@@ -35,6 +35,14 @@ calcHits <- function(obj,rois='all',append=FALSE){
   obj <- calcHits_fixations(obj,rois,append)
   obj <- calcHits_saccades(obj,rois,append)
 
+  #record what we did
+  funcall <- list(
+    rois=rois,
+    append=append
+  )
+
+  obj <- update_history(obj,'calcHits',funcall,append=F)
+
   return(obj)
 }
 
@@ -177,6 +185,24 @@ mapROIs <- function(obj,names,indicators=NULL,cleanup=FALSE){
       obj[[eyedata]][, c(roivars)] <- list(NULL)
     # trigger garbage collection:
     gc()
+
+
+    #keep track of our indicator variables
+    if(is.null(obj$roimapvars))
+      obj$roimapvars <- indicators
+    else
+      obj$roimapvars <- unique(c(obj$roimapvars,indicators))
+
+    #record what we did
+    funcall <- list()
+    funcall$names <- names
+    funcall$indicators <- indicators
+    funcall$cleanup <- cleanup
+
+    obj <- update_history(obj,'mapROIs',funcall,append=T)
+
+
+
   }
   return(obj)
 
@@ -295,6 +321,17 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL,type=
 
   # force garbage collection:
   gc()
+
+  #record what we did
+  funcall <- list()
+  funcall$start <- start
+  funcall$end <- end
+  funcall$binwidth <- binwidth
+  funcall$event <- event
+  funcall$type <- type
+  funcall$roi <- roi
+
+  obj <- update_history(obj,name='epoch_fixations',funcall,append=T)
 
   return(obj)
 }
@@ -584,3 +621,104 @@ subs_to_keep <- !(obj$subs %in% ID)
 
  return(obj)
 }
+
+add.subjects <- function(obj,edfs,beh){
+
+  comb <- obj
+
+  newsubs <- itrackr(edfs=edfs,resolution=obj$resolution,binocular=obj$binocular)
+  newsubs$history <- obj$history
+
+  newsubs <- replay_analysis(newsubs,beh=beh)
+
+  comb$edfs <- c(obj$edfs,newsubs$edfs)
+  comb$subs <- c(obj$subs,newsubs$subs)
+  comb$fixations <- rbind(obj$fixations,newsubs$fixations)
+  comb$fixations$fixation_key <- 1:nrow(comb$fixations)
+
+  comb$saccades <- rbind(obj$saccades,newsubs$saccades)
+  comb$saccades$saccade_key <- 1:nrow(comb$saccades)
+
+  comb$messages <- rbind(obj$messages,newsubs$messages)
+  comb$messages$message_key <- 1:nrow(comb$messages)
+
+  comb$blinks <- rbind(obj$blinks,newsubs$blinks)
+  comb$blinks$blink_key <- 1:nrow(comb$blink)
+
+  comb$beh <- rbind(obj$beh,newsubs$beh)
+
+  #if drift correction has been performed, remove from the "transform" table
+  if(length(obj$transform)>0)
+    comb$transform <- rbind(obj$transform,newsubs$transform)
+
+  #remove from epoched data-- very tedious (rois within events within fixations/samples)
+
+  epoch_types <- names(obj$epochs) #types: fixations/samples
+
+  for(t in epoch_types){
+    events <- names(obj$epochs[[t]]) #time-locking events
+    for(e in events){
+      rois <- names(obj$epochs[[t]][[e]]) #individual rois
+      for(r in rois){
+
+        comb$epochs[[t]][[e]][[r]] <- rbind(obj$epochs[[t]][[e]][[r]],newsubs$epochs[[t]][[e]][[r]])
+      }
+    }
+  }
+
+
+  return(comb)
+}
+
+
+reset <- function(obj, reload = FALSE, rebuild = FALSE,keep.rois = FALSE, beh=NULL){
+
+
+  if(reload){
+    newobj <- itrackr(edfs = obj$edfs, resolution = obj$resolution, binocular = obj$binocular)
+
+    if(keep.rois)
+      newobj$rois <- obj$rois
+  }
+  else{
+
+  #undo drift correction if it was done
+  obj <- undrift(obj)
+
+  newobj <- itrackr() #blank itrackr object
+
+
+  newobj$fixations <- dplyr::select(obj$fixations, -dplyr::matches('roi_*'),-dplyr::matches('*_hit'))
+  newobj$fixations <- newobj$fixations[!(names(newobj$fixations) %in% obj$roimapvars)]
+  newobj$saccades <- dplyr::select(obj$saccades, -dplyr::matches('roi_*'),-dplyr::matches('*_hit'))
+  newobj$saccades <- newobj$saccades[!(names(newobj$saccades) %in% obj$roimapvars)]
+  newobj$header <- obj$header[!(names(obj$header) %in% c(obj$roimapvars,obj$indexvars, obj$timevars))]
+  newobj$edfs <- obj$edfs
+  newobj$ids <- obj$ids
+  newobj$binocular <- obj$binocular
+  newobj$resolution <- obj$resolution
+  newobj$sample.dir <- obj$sample.dir
+  newobj$idvar <- obj$idvar
+  newobj$blinks <- obj$blinks
+  newobj$messages <- obj$messages
+  newobj$samples <- obj$samples
+
+  if(keep.rois)
+    newobj$rois <- obj$rois
+
+  }
+
+  if(rebuild){
+    print('rebuilding itrackr object using history of analysis')
+    newobj$rois <- list()
+    newobj$history <- obj$history
+
+    if(is.null(beh))
+      newobj$beh <- obj$beh[!(names(obj$beh) %in% c(obj$timevars))]
+
+    newobj <- replay_analysis(newobj,beh=beh)
+  }
+
+  return(newobj)
+}
+

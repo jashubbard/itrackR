@@ -35,6 +35,20 @@ epoch_samples <- function(obj,event,field='pa',epoch=c(-100,100))
 
   # obj$epochs[[event]] <- allepochs
 
+  #record what we did
+  obj$history$step <- obj$history$step +1
+
+  funcall <- list()
+  funcall$name <- 'epoch_samples'
+  funcall$step <- obj$history$step
+  funcall$event <- event
+  funcall$field <- field
+  funcall$epoch <- epoch
+
+  if(is.null(obj$history$epoch_samples))
+    obj$history_epoch_samples <- funcall
+  else
+    obj$history$epoch_samples <- c(obj$history$epoch_samples,funcall)
 
   return(obj)
 
@@ -195,6 +209,15 @@ remove_blinks <- function(obj, interpolate=FALSE)
     rm(samps)
 
   }
+
+  #record what we did
+  obj$history$step <- obj$history$step + 1
+
+  funcall <- list()
+  funcall$name <- 'remove_blinks'
+  funcall$step <- obj$history$step
+  funcall$interpolate <- interpolate
+
 
   return(obj)
 }

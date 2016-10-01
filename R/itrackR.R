@@ -8,6 +8,7 @@ itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern='*.edf',resolution=
               idvar = 'ID',
               binocular = binocular,
               indexvars = NULL,
+              roimapvars = NULL,
               timevars = NULL,
               resolution = resolution,
               header = data.frame(),
@@ -17,9 +18,11 @@ itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern='*.edf',resolution=
               saccades = data.frame(),
               blinks = data.frame(),
               messages = data.frame(),
+              rois = list(),
               epochs = list(),
               beh = data.frame(),
-              transform = list()
+              transform = list(),
+              history = list(step=0)
   )
 
 
@@ -152,6 +155,16 @@ set_index <- function(obj,varnames,patterns,numeric.only=FALSE)
 
   obj$indexvars <- varnames
 
+  #record what we did for later
+
+  funcall <- list()
+  funcall$varnames <- varnames
+  funcall$patterns <- patterns
+  funcall$numeric.only = numeric.only
+
+  obj <- update_history(obj,'set_index',funcall,append=F)
+
+
   return(obj)
 }
 
@@ -187,6 +200,17 @@ find_messages <- function(obj,varnames,patterns,numeric.only = FALSE,timestamp=F
 
   obj$header <- dplyr::left_join(obj$header,msg_index,by=c('ID','eyetrial'))
 
+  #record what we did
+  obj$history$step <- obj$history$step+1
+
+  funcall <- list()
+  funcall$varnames <- varnames
+  funcall$patterns <- patterns
+  funcall$numeric.only <- numeric.only
+  funcall$timestamp <- timestamp
+
+  obj <- update_history(obj,'find_messages',funcall,append=T)
+
   if(timestamp)
     obj$timevars <- varnames
 
@@ -212,19 +236,13 @@ add_behdata <- function(obj,beh,append=FALSE){
 
     }
 
+  #record what we did
+  funcall <- list()
+  funcall$behnames <- names(beh)
+
+  obj <- update_history(obj,'add_behdata',funcall,append=F)
+
   return(obj)
-}
-
-get_subdata <- function(obj,id,fields = c('header','samples'))
-{
-  subobj <- itrackr()
-
-  for(f in fields)
-  {
-    subobj[[f]] <- subset(obj[[f]],ID==id)
-  }
-
-  return(subobj)
 }
 
 
@@ -242,7 +260,6 @@ makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius
 
   if(length(yradius)==1 && nrow(coords)>1)
     yradius <- rep(yradius[1],nrow(coords))
-
 
 
   if(length(obj$rois)==0 || append==F){
@@ -296,6 +313,21 @@ makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius
 			roipos <- roipos + 1
 		}
 	}
+
+	#record what we did
+	funcall <- list(coords=coords,
+	                shapes=shapes,
+	                radius=radius,
+	                xradius=xradius,
+	                yradius=yradius,
+	                angles=angles,
+	                names=names,
+	                polygon=polygon,
+	                append=append)
+
+	obj <- update_history(obj,'makeROIs',funcall,append=T)
+
+
   return(obj)
 
 }
@@ -414,7 +446,9 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
   return(output)
 }
 
-drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
+
+
+drift_correct <- function(obj,vars=c('ID'),eyedata='fixations',threshold = 10){
 
   fixnames <- names(obj$fixations)
 
@@ -457,6 +491,14 @@ drift_correct <- function(obj,vars=c('ID'),eydata='fixations',threshold = 10){
 
   obj$transform$fixations <- fixdata[c('ID','eyetrial','fixation_key','shift_x','shift_y')]
 
+  #record what we did
+
+  funcall <- list()
+  funcall$eyedata <- eyedata
+  funcall$vars <- vars
+  funcall$threshold <- threshold
+
+  obj <- update_history(obj,'drift_correct',funcall,append=F)
 
 
 return(obj)
@@ -475,6 +517,10 @@ undrift <- function(obj){
   obj$fixations <- fixdata[names(obj$fixations)]
 
   obj$transform$fixations <- NULL
+
+  #erase the record!
+  obj$history$step <- obj$history$step -1
+  obj$history$drift_correct <- NULL
 
   return(obj)
 

@@ -128,6 +128,14 @@ Once the ROIs are added, we can easily make scatterplots of fixations for each s
 plot(z, zoom=TRUE)
 ```
 
+You can also plot everyone's data on one plot using the `oneplot` argument. 
+
+```{r,fig.show='hold',fix.width=4,fig.height=4}
+plot(z,zoom=TRUE,oneplot=TRUE)
+
+```
+
+
 ## Merging with behavioral data
 
 Ideally, we send a message to Eyelink on every trial in order to identify it in the EDF file. Every time the eyetracker is started and stopped, we call this a separate trial. In this example, every trial the message "BLOCK X" and "TRIAL X" was sent to eyelink. We can see the trial-wise information in the header of our object:
@@ -165,6 +173,13 @@ We can also see that the header has been updated
 `z$header`
 ```{r}
 knitr::kable(head(z$header, 10))
+```
+
+Now we can plot a subset of our data based on the behaivoral data. Just use the `condition` argument when plotting. Note it uses a similar syntax as `subset`. Here we're plotting data only from the first 5 blocks:
+
+```{r,fig.show='hold',fix.width=4,fig.height=4}
+plot(z,zoom=TRUE,oneplot=TRUE, condition = Block<=5)
+
 ```
 
 
@@ -218,6 +233,14 @@ saccs <- eyemerge(z,'saccades',behdata=c('Task'))
 
 #by default only mapped ROIs are included. Here we can include all 13 rois, plus the mapped ones
 fixes_all <- eyemerge(z,'fixations',all.rois = T)
+
+```
+
+We can also subset based on our behavioral variables using the `condition` argument:
+
+```{r}
+fixes_first5 <- eyemerge(z,'fixations',condition = Block <= 5)
+max(fixes_first5$Block,na.rm=T)
 
 ```
 

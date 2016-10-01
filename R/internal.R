@@ -79,11 +79,101 @@ timeshift <- function(df,baseline,cols){
 
   return(df)
 
+}
 
 
+update_history <- function(obj,name,funcall,append=F){
 
+  obj$history$step <- obj$history$step + 1
+  funcall$step <- obj$history$step
+  funcall$name <- name
 
+  if(append){
 
+    #can be called multiple times, record each one
+    if(is.null(obj$history[[name]])){
+      obj$history[[name]] <- list()
+      obj$history[[name]][[1]] <- funcall
+      }
+    else{
+      if(!is_duplicate_log(funcall,obj$history[[name]])){
+        pos <- length(obj$history[[name]])+1
+        obj$history[[name]][[pos]] <- funcall
+      }
+    }
+  }
+  else{
+    obj$history[[name]] <- list()
+    obj$history[[name]][[1]] <- funcall
+  }
+
+  return(obj)
 
 }
+
+
+is_duplicate_log <- function(ls,nested_ls){
+
+  lsnames <- names(ls)
+  lsnames <- lsnames[!(lsnames %in% 'step')]
+
+  is.duplicate <- FALSE
+
+  if(length(nested_ls)==0){
+    is.duplicate = FALSE
+    return(is.duplicate)
+  }
+
+
+    for(i in 1:length(nested_ls)){
+
+      ilist <- nested_ls[[i]]
+      inames <- names(ilist)
+      inames <- inames[!(inames %in% 'step')]
+
+      if(identical(ilist[inames],ls[lsnames]))
+        is.duplicate = TRUE
+    }
+
+  return(is.duplicate)
+
+}
+
+replay_analysis <- function(obj,allsteps = NULL,beh=NULL){
+
+  allsteps <- c('set_index','find_messages','add_behdata','makeROIs','calcHits','mapROIs','epoch_fixations','epoch_samples')
+
+  for(step in allsteps){
+
+    if(step %in% names(z$history)){
+
+      allcalls <- z$history[[step]]
+
+      for(funcall in allcalls){
+
+        otherargs <- list(obj)
+
+        if(step=='add_behdata'){
+
+          if(is.null(beh))
+            beh <- obj$beh[,funcall$behnames]
+
+          otherargs <- c(otherargs,list(beh))
+          funcall$behnames <- NULL
+          funcall$append <- FALSE
+        }
+
+        if(step=='mapROIs')
+          funcall$cleanup=TRUE
+
+        namedargs <- funcall[!(names(funcall) %in% c('step','name'))]
+        obj <- do.call(step,c(otherargs,namedargs))
+    }
+
+  }
+  }
+  return(obj)
+}
+
+
 
