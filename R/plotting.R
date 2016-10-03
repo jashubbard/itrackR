@@ -1,10 +1,27 @@
-# plot <- function(obj,zoom=FALSE,crosshairs=TRUE,rois=TRUE,which='all',names=FALSE){
-#   UseMethod('plot')
-#
-# }
-
+#' @title Plot data from itrackR object
+#'
+#' @description
+#' This creates a scatterplot of fixation data from an itrackR object
+#'
+#' @param obj the itrackR object to plot
+#' @param zoom whether to zoom within the bounds of the screen resolution (obj$resolution)
+#' @param corsshairs show dotted red lines crossing through the center of the screen (default = TRUE)
+#' @param rois show outlines of the rois in the plots (default = TRUE)
+#' @param whichROIs a list of ROI names if you want to display only a subset of them
+#' @param IDs list of subject IDs if you want to plot only a subset of subjects
+#' @param condition for subsetting based on behavioral data. Syntax is the same as used in \code{subset}
+#' @param oneplot whether to plot all subjects' data on a single plot (default = FALSE). By default it creates a separate plot per subject
+#' @param summarize create 2d histogram of fixations. Specify the number of bins.
+#'
+#' @author Jason Hubbard, \email{hubbard3@@uoregon.edu}
+#'
+#' @examples
+#' \dontrun{
+#' z <- itrackr(edfs=itrackr.data('edfs'))
+#' plot(z, zoom = T)
+#' }
+#'
 plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0,quick=F,condition=NULL,oneplot=F){
-
 
   condition <- deparse(substitute(condition))
 
@@ -21,7 +38,7 @@ plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all'
   if(quick)
     fixdata <- dplyr::distinct(dplyr::select_(fixdata,.dots=c(obj$idvar,'gavx','gavy')))
 
-  if(rois && !is.null(obj$rois)){
+  if(rois && length(obj$rois)>0){
     df <- rois2df(obj)
 
     if(whichROIs[1] !='all')
