@@ -563,6 +563,12 @@ itrackR.data <- function(data){
   return(output)
 }
 
+
+itrackr.data <- function(data){
+  output <- itrackR.data(data)
+  return(output)
+}
+
 remove.subjects <- function(obj,ID){
 
   if(length(ID)==1)
