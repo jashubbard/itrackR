@@ -1,5 +1,26 @@
-#class constructor
-itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern='*.edf',resolution=c(1024,768),datadir=tempdir(),binocular=FALSE)
+#' @title Create an itrackR object
+#'
+#' @description
+#' Create an itrackR object by loading edfs
+#'
+#' @param edfs list of edf file names as strings. Not necessary if you use \code{path} and \code{pattern}
+#' @param path if not providing edf file names, you can provide a path to a directory and a search string
+#' @param pattern search string for finding edf files, as a regular expression (default = '*.edf')
+#' @param resolution a list specifying the x and y resolution of the monitor (default = c(1024,768))
+#' @param binocular whether the experiment used binocular tracking (currently not supported, default = FALSE)
+
+#' @author Jason Hubbard, \email{hubbard3@@uoregon.edu}
+#'
+#' @examples
+#' \dontrun{
+#' # itrackr.data('edfs') returns full path to 2 edf files
+#' z <- itrackr(edfs=itrackr.data('edfs'))
+#'
+#' #Loads all edf files starting with 3 from a certain directory
+#' z <- itrackr(path='/path/to/some/directory', pattern = '3*.edf')
+#' }
+#'
+itrackr <- function(edfs = NULL,path=NULL,pattern='*.edf',resolution=c(1024,768),binocular=FALSE)
 {
 
   me <- list(
@@ -37,8 +58,8 @@ itrackr <- function(txt = NULL,edfs = NULL,path=NULL,pattern='*.edf',resolution=
   if(!is.null(path))
     me <- load_edfs(me,path=path,pattern=pattern)
 
-  if(!is.null(txt))
-    me <- load_txt(me,filename=txt)
+  # if(!is.null(txt))
+  #   me <- load_txt(me,filename=txt)
 
   return(me)
 
@@ -506,6 +527,10 @@ return(obj)
 
 
 undrift <- function(obj){
+
+  #if there's no drift correction, just go back
+  if(length(obj$transform)==0)
+    return(obj)
 
   fixdata <- dplyr::left_join(obj$fixations, obj$transform$fixations,by=c(obj$idvar,'eyetrial','fixation_key'))
 
