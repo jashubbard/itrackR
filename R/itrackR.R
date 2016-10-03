@@ -65,6 +65,10 @@ itrackr <- function(edfs = NULL,path=NULL,pattern='*.edf',resolution=c(1024,768)
 
 }
 
+#' @title load edf files
+#'
+#' @description
+#' Internal function used by \code{itrackr} to load edfs. Do not call directly.
 load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 
   fields <- c('fixations','saccades','blinks','messages','header')
@@ -110,13 +114,6 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
   }
 
 
-
-#   if(samples)
-#     {
-#       allsamples <- load_samples(obj)
-#       obj$samples <- allsamples$samples
-#     }
-
   if(is.null(obj$edfs))
     obj$edfs <- unlist(lapply(allbatch,function(x) x$filename))
 
@@ -128,7 +125,10 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
 
 }
 
-
+#' @title load from text file from Eyelink DataViewer reports
+#'
+#' @description
+#' Experimental function for loading data from text files created from reports in DataViewer. Currently unused.
 load_txt <- function(obj,type='fixations',filename,sep='\t'){
 
 
@@ -170,6 +170,41 @@ return(obj)
 
 }
 
+
+#' @title Find messages to use as index variables in itrackR object
+#'
+#' @description
+#' Mostly a wrapper for \link{\code{find_messages}}, but extracts messages and sets them as \code{obj$indexvars}. These are used in other functions
+#' like \link{\code{add_behdata}} and \link{\code{eyemerge}} to use as index variables for merging with behavioral data. This assumes you sent messages
+#' to Eyelink during an experiment to specify the trial number. It can also handle multiple variables (e.g., Block 5, Trial 6).
+#'
+#' @param obj an itrackR object
+#' @param varnames a list specifying what we want the variable names to be called
+#' @param patterns search strings for the messages of interest (can use regular expressions)
+#' @param numeric.only return only numeric information from the messages (default = FALSE). Useful for indexing variables (e.g., "Trial 5" is converted to 5).
+#'
+#'
+#' @return all variables are stored in \code{obj$header}, based on the \code{varnames} specified. You can also see them in \code{obj$indexvars}.
+#' When calling \code{eyemerge}, these will be appended to the data frame. When using \code{\link{add_behdata}}, variable names
+#' in the behavioral file should match \code{varnames}.
+#'
+#'
+#' @examples
+#' \dontrun{
+#' # itrackr.data('edfs') returns full path to 2 edf files
+#' z <- itrackr(edfs=itrackr.data('edfs'))
+#'
+#' #Extracts messages like "BLOCK 1", and "TRIAL 7" and creates variables "Block" and "Trial", giving them values
+#' # 1 and 7.
+#' z <- set_index(z,c('Block', 'Trial'), patterns=c('BLOCK [0-9]*', 'TRIAL [0-9][0-9]*'), numeric.only = TRUE)
+#'
+#' #you can see the result by looking at the header
+#' View(z$header)
+#' }
+#'
+#'
+#' @seealso \code{\link{add_behdata}}, \code{\link{find_messages}}
+#'
 set_index <- function(obj,varnames,patterns,numeric.only=FALSE)
 {
   obj <- find_messages(obj,varnames,patterns,numeric.only)
@@ -189,7 +224,35 @@ set_index <- function(obj,varnames,patterns,numeric.only=FALSE)
   return(obj)
 }
 
-
+#' @title Find messages sent to Eyelink
+#'
+#' @description
+#' General function for finding messages sent to Eyelink and extracting information from them. Useful if you want timestamps
+#' of particular events merged with behavioral data. Also used by \code{\link{set_index}} to extract information for index variables (for merging).
+#'
+#' @param obj an itrackR object
+#' @param varnames a list specifying what we want the variable names to be called
+#' @param patterns search strings for the messages of interest (can use regular expressions)
+#' @param numeric.only return only numeric information from the messages (default = FALSE). Useful for indexing variables (e.g., "Trial 5" is converted to 5).
+#' @param timestamp return the timestamp of the message, not the message itself (default = FAlSE)
+#'
+#'
+#' @return all messages are stored in \code{obj$header}, based on the \code{varnames} specified.
+#' When calling \code{eyemerge}, these will be appended to the data frame.
+#'
+#'
+#' @examples
+#' \dontrun{
+#' # itrackr.data('edfs') returns full path to 2 edf files
+#' z <- itrackr(edfs=itrackr.data('edfs'))
+#'
+#' #Loads all edf
+#' z <- find_messages(z,c("STIMONSET"), patterns=c('STIMONSET'), timestamp = TRUE)
+#' }
+#'
+#'
+#' @seealso \code{\link{set_index}}
+#'
 find_messages <- function(obj,varnames,patterns,numeric.only = FALSE,timestamp=FALSE)
   {
 
@@ -239,6 +302,45 @@ find_messages <- function(obj,varnames,patterns,numeric.only = FALSE,timestamp=F
 
 }
 
+
+#' @title Merge behavioral data with itrackR object
+#'
+#' @description
+#' Take a data frame containing behaivoral data and merge with the eyetracking data in an itrackR object. Merging is done based on \code{ID} and any
+#' index variables set using \code{\link{set_index}}. Index variables should match the same ones that are in \code{obj$header}.
+#'
+#'
+#'
+#' @param obj an itrackR object
+#' @param beh a data frame containing behavioral data. Should at least have the column \code{ID} which matches ID names/numbers in \code{obj$subs}.
+#' @param append set to TRUE if you've already added behavioral data and you're adding more columns (default = FALSE, overwrite existing data).
+
+#'
+#'
+#' @return data frame is saved in \code{obj$beh}, with the extra column \code{eyetrial} which matches the eyetracking data.
+#' Variables in \code{obj$beh} can be used for subsetting when calling \code{\link{eyemerge}}, \code{\link{plot.itrackR}}, and \code{\link{fixation_timeseries}}.
+#'
+#' @examples
+#' \dontrun{
+#' # itrackr.data('edfs') returns full path to 2 edf files
+#' z <- itrackr(edfs=itrackr.data('edfs'))
+#'
+#' #Extracts messages like "BLOCK 1", and "TRIAL 7" and creates variables "Block" and "Trial", giving them values
+#' # 1 and 7.
+#' z <- set_index(z,c('Block', 'Trial'), patterns=c('BLOCK [0-9]*', 'TRIAL [0-9][0-9]*), numeric.only = TRUE)
+#'
+#' beh <- itrackr.data('beh)
+#'
+#' z <- add_behdata(z,beh)
+#'
+#' #notice the new eyetrial variable...
+#' View(z$beh)
+#'
+#' }
+#'
+#'
+#' @seealso \code{\link{eyemerge}}
+#'
 add_behdata <- function(obj,beh,append=FALSE){
 
   if(append){
@@ -266,9 +368,45 @@ add_behdata <- function(obj,beh,append=FALSE){
   return(obj)
 }
 
+#' @title Create regions of interest (ROIs) for itrackR object
+#'
+#' @description
+#' Create regions of interest (ROIs) for an itrackR object. ROIs can be circular, elliptical, or polygons. After creating ROIs, you use \code{\link{calcHits}}
+#' to determine whether each fixation/saccade fell within each ROI. The helper functions \code{\link{radialCoords}} and \code{\link{roiFlower}} can be used to
+#' generate coordinates around some set of coordinates.
+#'
+#'
+#' @param obj an itrackR object
+#' @param coords data frame or matrix specifying x and y coordinates for the center of each ROI (default = (0,0), upper-left corner)
+#' @param shapes shape for each ROI listed, can be \code{'circle'}, \code{'ellipse'}, or \code{'polygon'}
+#' @param radius for circular ROIs, radius of the circle (in pixels)
+#' @param xradius for elliptical ROIs, radius along the x dimension
+#' @param yradius for elliptical ROIs, radius along the y dimension
+#' @param angles for elliptical ROIs, rotation for each ROI in degrees.
+#' @param names optional, name for each ROI. Defaults to 1 to number of ROIs listed. ROIs should not have duplicate names!
+#' @param polygon for polygonal ROIS, data frame or matrix specifying corners of polygon
+#' @param append whether we're adding to our list of ROIs or overwriting (default = FALSE, overwrite)
 
-# coords defaults to (0, 0) so you can specify a polygon without the need to specify coords (it is not used because all coordinates are inside the poylgon data frame)
-makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius=0,xradius=0,yradius=0,angles=NULL,names=NULL,polygon=data.frame(x=c(),y=c()),append=F){
+#'
+#'
+#' @return ROI information is stored in \code{obj$rois}. Uses the \code{\link{spatstat}} package to store ROI information.
+#' To get ROI information as a data frame, you can use the internal function \code{\link{roi2df}}. ROIs can be plotted using \code{\link{plot.rois}}.
+#'
+#' @examples
+#' \dontrun{
+#' # itrackr.data('edfs') returns full path to 2 edf files
+#' z <- itrackr(edfs=itrackr.data('edfs'))
+#'
+#' coords <- matrix(c(512,384,100,100),nrow=2,byrow=T)
+#'
+#' z <- makeROIs(z,coords,shape='ellipse',xradius=60, yradius=120, angles = c(45, 75))
+#' }
+#'
+#'
+#' @seealso  \code{\link{plot.rois}} \code{\link{radialCoords}}  \code{\link{roiFlower}} \code{\link{calcHits}}
+#'
+makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius=0,xradius=0,yradius=0,angles=NULL,
+                     names=NULL,polygon=data.frame(x=c(),y=c()),append=F){
 
   if(length(shapes)==1 && nrow(coords)>1)
     shapes <- rep(shapes[1],nrow(coords))
@@ -354,6 +492,60 @@ makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius
 }
 
 
+#' @title Create data frame of merged eyetracking and behavioral data
+#'
+#' @description
+#' Function for creating a flat table of eyetracking and behavioral data from itrackR object. Can be used for gathering fixation, saccade or blink data,
+#' as well as fixation data epoched around some event. Will include all behavioral variables, or a subset of named variables.
+#'
+#'
+#'
+#' @param obj an itrackR object
+#' @param eyedata type of eyetracking data to include. Can be:
+#' \itemize{
+#'  \item \code{'fixations'} (default). Fixation start/end times and x/y coordinates
+#'  \item \code{'saccades'} Saccade start/end times and star/end x/y coordinates
+#'  \item \code{'blinks'} Blink start/end times
+#'  \item \code{'epoched_fixations'} fixation data epoched around some event using \code{\link{epoch_fixations}}
+#' }
+#'
+#' @param behdata list of variables from \code{obj$beh} to include in the output (default = 'all').
+#' @param all.rois whether to include hits/misses for all rois in itrackR object (default = FALSE).
+#' @param event the timelocking event when getting epoched fixations
+#' @param roi the roi when getting epoched fixations
+#' @param trialtime whether to convert fixation/saccade times relative to the current trial, or leave relative to whole experiment.
+#' @param condition subset data according to some behavioral variables. Can use unquoted variable names as in \code{\link{subset}}. (e.g., condition = Block <= 5)
+#' @param condition.str whether the condition is saved as a string ('Block <= 5'). Used internally.
+#'
+#' @return returns a data frame with the variables from \code{obj$beh} merged with the eyetracking data requested. Merging is based on \code{ID}, and \code{obj$indexvars}.
+#' This corresponds to \code{obj$beh$eyetrial} as well.
+#' @examples
+#' \dontrun{
+#' # itrackr.data('edfs') returns full path to 2 edf files
+#' z <- itrackr(edfs=itrackr.data('edfs'))
+#'
+#' #Extracts messages like "BLOCK 1", and "TRIAL 7" and creates variables "Block" and "Trial", giving them values
+#' # 1 and 7.
+#' z <- set_index(z,c('Block', 'Trial'), patterns=c('BLOCK [0-9]*', 'TRIAL [0-9][0-9]*), numeric.only = TRUE)
+#'
+#' beh <- itrackr.data('beh)
+#'
+#' z <- add_behdata(z,beh)
+#'
+#' #get fixation data
+#' fixes <- eyemerge(z,'fixations')
+#'
+#' #get data only when Task==2
+#' fixes <- eyemerge(z, 'fixations', condition = Task==2)
+#'
+#' #saccades
+#' saccs <- eyemerge(z,'saccades')
+#'
+#' }
+#'
+#'
+#' @seealso \code{\link{epoch_fixations}} \code{\link{set_index}}
+#'
 eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL,roi=NULL,trialtime = TRUE,condition=NULL,condition.str=FALSE){
 
   if(length(obj$beh)==0)
@@ -469,7 +661,49 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
 
 
 
-drift_correct <- function(obj,vars=c('ID'),eyedata='fixations',threshold = 10){
+#' @title Perform drift correction on fixations for itrackR object
+#'
+#' @description
+#' Correct for drifts in fixation data. Algorithm computes the median x/y coordinates separately for each subject and behavioral variable specified,
+#' then fixations are adjusted based on difference between this "true" center and the center of the screen based on \code{obj$resolution}. Fixations are only
+#' adjusted if deviation is greater than some threshold.
+#'
+#'
+#' @param obj an itrackR object
+#' @param vars variables to specify subsets of data for performing drift correction. default is \code{'ID'}. Can also name any column in \code{obj$beh} (e.g., 'Block')
+#' @param append set to TRUE if you've already added behavioral data and you're adding more columns (default = FALSE, overwrite existing data).
+#' @param threshold do not adjust fixations that deviate less than this threshold (in pixels). Default is 10 pixels
+#'
+#'
+#' @return All fixations in \code{obj$fixations} are adjusted, and adjustment amounts are stored in \code{obj$transform}.
+#' To undo correction, use \code{\link{undrift}}.
+#
+#' @examples
+#' \dontrun{
+#' # itrackr.data('edfs') returns full path to 2 edf files
+#' z <- itrackr(edfs=itrackr.data('edfs'))
+#'
+#' #Extracts messages like "BLOCK 1", and "TRIAL 7" and creates variables "Block" and "Trial", giving them values
+#' # 1 and 7.
+#' z <- set_index(z,c('Block', 'Trial'), patterns=c('BLOCK [0-9]*', 'TRIAL [0-9][0-9]*), numeric.only = TRUE)
+#'
+#' beh <- itrackr.data('beh)
+#'
+#' z <- add_behdata(z,beh)
+#'
+#' #perform drift correction for each subject and Block.
+#' z <- drift_correct(z, vars=c('Block'))
+#'
+#' #if you're curious how adjustment was done, check it out:
+#'
+#' View(z$transform)
+#'
+#' }
+#'
+#'
+#' @seealso \code{\link{undrift}}
+#'
+drift_correct <- function(obj,vars=c('ID'),threshold = 10){
 
   fixnames <- names(obj$fixations)
 
@@ -526,6 +760,51 @@ return(obj)
 }
 
 
+#' @title Reverse drift correction performed on an itrackR object
+#'
+#' @description
+#' In case you want to undo the drift correction performed by \code{\link{drift_correct}}. It puts fixations back to original coordinates and deletes \code{obj$transform}.
+#'
+#'
+#' @param obj an itrackR object
+#'
+#' @return All fixations in \code{obj$fixations} are adjusted back to original coordinates. \code{obj$transform} is deleted.
+
+#
+#' @examples
+#' \dontrun{
+#' # itrackr.data('edfs') returns full path to 2 edf files
+#' z <- itrackr(edfs=itrackr.data('edfs'))
+#'
+#' #Extracts messages like "BLOCK 1", and "TRIAL 7" and creates variables "Block" and "Trial", giving them values
+#' # 1 and 7.
+#' z <- set_index(z,c('Block', 'Trial'), patterns=c('BLOCK [0-9]*', 'TRIAL [0-9][0-9]*), numeric.only = TRUE)
+#'
+#' beh <- itrackr.data('beh)
+#'
+#' z <- add_behdata(z,beh)
+#'
+#' #fixations before correcting
+#' plot(z)
+#'
+#' #perform drift correction for each subject and Block.
+#' z <- drift_correct(z, vars=c('Block'))
+#'
+#' #after correcting
+#' plot(z)
+#'
+#'
+#' #never mind
+#' z <- undrift(z)
+#'
+#' #back to normal
+#' plot(z)
+#'
+#' }
+#'
+#'
+#' @seealso \code{\link{drift_correct}}
+#'
 undrift <- function(obj){
 
   #if there's no drift correction, just go back
