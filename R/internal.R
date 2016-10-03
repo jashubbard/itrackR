@@ -163,8 +163,8 @@ replay_analysis <- function(obj,allsteps = NULL,beh=NULL){
           funcall$append <- FALSE
         }
 
-        if(step=='mapROIs')
-          funcall$cleanup=TRUE
+        # if(step=='mapROIs')
+        #   funcall$cleanup=FALSE
 
         namedargs <- funcall[!(names(funcall) %in% c('step','name'))]
         obj <- do.call(step,c(otherargs,namedargs))
