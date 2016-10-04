@@ -19,7 +19,8 @@ epoch_samples <- function(obj,event,field='pa',epoch=c(-100,100))
     header <- subset(obj$header,ID==id)
     events <- header[[event]][!is.na(header[[event]])]
     trials <- header$eyetrial[!is.na(header[[event]])]
-    samples <- readRDS(obj$samples[[i]])
+    samples <- read_saved_samples(obj$samples[[i]],ID=obj$subs[i],cols=c('ID','time','eyetrial',field))
+    # samples <- readRDS(obj$samples[[i]])
 
     thisepoch <- edfR::epoch.samples(events,as.data.frame(samples),sample.field=field,epoch=epoch,eyetrial=T)
 
@@ -54,10 +55,15 @@ epoch_samples <- function(obj,event,field='pa',epoch=c(-100,100))
 
 }
 
-load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
-
+load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2, db=FALSE){
 
   allsamps <- list()
+
+  if(db && parallel){
+    parallel = FALSE
+    warning('Changing parallel = FALSE because db is set to TRUE. Cannot write to database in parallel (yet).')
+
+  }
 
 
   #check for directory to save .rds files into
@@ -86,7 +92,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
     #run with dopar
     allsamps <- foreach::foreach(edf=iterators::iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
     {
-      fname <- load_sample_file(obj,edf,force=force)
+      fname <- load_sample_file(obj,edf,force=force,db=db)
       fname
     }
 
@@ -95,7 +101,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
   else{
 
     #serial method - use lapply
-    allsamps <- lapply(obj$edfs, function(x) load_sample_file(obj,x,force=force))
+    allsamps <- lapply(obj$edfs, function(x) load_sample_file(obj,x,force=force,db=db))
 
   }
 
@@ -106,12 +112,16 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE,ncores = 2){
 
 }
 
-load_sample_file <- function(obj,edf,force=FALSE){
+load_sample_file <- function(obj,edf,force=FALSE,db=FALSE){
 
    id <- edf2id(edf)
-   fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
 
-  if(file.exists(fname) && !force)
+   if(!db)
+    fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
+   else
+     fname <- file.path(obj$sample.dir,'samples.sqlite')
+
+  if(!db && file.exists(fname) && !force)
     samps <- readRDS(fname)
   else{
     samps <- edfR::edf.samples(edf,trials=T,eventmask=T)
@@ -135,7 +145,31 @@ load_sample_file <- function(obj,edf,force=FALSE){
     baseline <- samps[1,time]-1
     samps[,time := time-baseline]
 
-    saveRDS(samps,fname,compress = T)
+    if(!db)
+       saveRDS(samps,fname,compress = T)
+
+    else{
+
+      db.pupil = RSQLite::dbConnect(RSQLite::SQLite(),dbname=fname)
+
+      overwrite = F
+
+      if(file.exists(fname) && !force){
+        append=T
+      }
+      else{
+        append = F
+        overwrite = T
+      }
+
+      samps$ID <- id
+
+      #write data to database. Append if file already exists
+      RSQLite::dbWriteTable(conn=db.pupil, name='SAMPLES',samps,overwrite=overwrite,append=append,row.names=F)
+      RSQLite::dbDisconnect(db.pupil)
+
+    }
+
   }
 
   return(fname)
@@ -187,7 +221,8 @@ remove_blinks <- function(obj, interpolate=FALSE)
   for(i in 1:length(obj$edfs))
   {
 
-    samps<- readRDS(obj$samples[[i]])
+    samps <- read_saved_samples(obj$samples[[i]],ID=obj$subs[i],cols=c('ID','time','gx','gy','pa'))
+    # samps<- readRDS(obj$samples[[i]])
 
     #code bad samples as "blinks"
     samps$blink[samps$gx==1e08 | samps$gy==1e08] <- 1
@@ -203,6 +238,7 @@ remove_blinks <- function(obj, interpolate=FALSE)
       samps[, gx := interpolate.blinks(samps$gx,samps$blink)]
       samps[, gy := interpolate.blinks(samps$gy,samps$blink)]
     }
+
 
 
     saveRDS(samps,obj$samples[[i]],compress = T)
@@ -290,4 +326,28 @@ baseline_epochs <- function(epochs,baseline=c(1,100),method='percent'){
 
 
 
+read_saved_samples <- function(fname,ID=NULL,cols = NULL){
 
+  if(tolower(tools::file_ext(fname))=='rds')
+    data <- readRDS(fname)
+
+  if(tolower(tools::file_ext(fname))=='sqlite'){
+
+    my_db <- dplyr::src_sqlite(fname, create = F)
+
+    data <- tbl(my_db, from = 'SAMPLES') %>%
+      filter_(.dots=c(paste0('ID==',ID)))
+
+    if(!is.null(cols))
+      data <- select_(data,.dots=cols)
+
+    data <- data.table::as.data.table(data)
+
+      rm(my_db)
+      gc()
+  }
+
+
+
+  return(data)
+}

@@ -25,7 +25,8 @@ Imports:
     foreach,
     magrittr,
     data.table,
-    edfR
+    edfR,
+    RSQLite
 Suggests:
     rmarkdown,
     testthat
