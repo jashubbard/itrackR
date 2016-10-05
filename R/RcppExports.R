@@ -5,3 +5,7 @@ fast_sql <- function(dbname, sql) {
     .Call('itrackR_fast_sql', PACKAGE = 'itrackR', dbname, sql)
 }
 
+update_rows <- function(dbname, tstart, tend) {
+    .Call('itrackR_update_rows', PACKAGE = 'itrackR', dbname, tstart, tend)
+}
+

@@ -29,7 +29,9 @@ Imports:
     RSQLite,
     Rcpp (>= 0.12.7)
 LinkingTo:
-    Rcpp
+    Rcpp, RcppArmadillo
+Depends:
+ RcppArmadillo
 Suggests:
     rmarkdown,
     testthat
