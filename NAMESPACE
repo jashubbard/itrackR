@@ -1,4 +1,7 @@
 exportPattern("^[[:alpha:]]+")
+importFrom(Rcpp, evalCpp)
+useDynLib(itrackR)
+
 export("%>%")
 export("%dopar%")
 export(":=")

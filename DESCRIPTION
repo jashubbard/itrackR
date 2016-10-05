@@ -26,7 +26,10 @@ Imports:
     magrittr,
     data.table,
     edfR,
-    RSQLite
+    RSQLite,
+    Rcpp (>= 0.12.7)
+LinkingTo:
+    Rcpp
 Suggests:
     rmarkdown,
     testthat
