@@ -55,16 +55,9 @@ epoch_samples <- function(obj,event,field='pa',epoch=c(-100,100))
 
 }
 
-load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2, db=FALSE){
+load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
 
   allsamps <- list()
-
-  if(db && parallel){
-    parallel = FALSE
-    warning('Changing parallel = FALSE because db is set to TRUE. Cannot write to database in parallel (yet).')
-
-  }
-
 
   #check for directory to save .rds files into
   if(!is.null(outdir))
@@ -90,9 +83,9 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2, db=
     doParallel::registerDoParallel(cl)
 
     #run with dopar
-    allsamps <- foreach::foreach(edf=iterators::iter(obj$edfs),.packages=c('edfR','data.table','itrackR')) %dopar%
+    allsamps <- foreach::foreach(edf=iterators::iter(1:length(obj$edfs)),.packages=c('data.table')) %dopar%
     {
-      fname <- load_sample_file(obj,edf,force=force,db=db)
+      fname <- load_sample_file(obj,edf,force=force)
       fname
     }
 
@@ -101,7 +94,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2, db=
   else{
 
     #serial method - use lapply
-    allsamps <- lapply(obj$edfs, function(x) load_sample_file(obj,x,force=force,db=db))
+    allsamps <- lapply(1:length(obj$edfs), function(x) load_sample_file(obj,x,force=force))
 
   }
 
@@ -112,68 +105,128 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2, db=
 
 }
 
-load_sample_file <- function(obj,edf,force=FALSE,db=FALSE){
 
-   id <- edf2id(edf)
+#write each sample file as a separate database
+load_sample_file <- function(obj,i,force=F){
 
-   if(!db)
-    fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
-   else
-     fname <- file.path(obj$sample.dir,'samples.sqlite')
+  #create the directory if it doesn't exist
+  dir.create(path.expand(obj$sample.dir), showWarnings = FALSE)
+  dbname <- file.path(path.expand(obj$sample.dir),paste0(obj$subs[i],'_samples.sqlite'))
+  dbname_relative <- file.path(obj$sample.dir,paste0(obj$subs[i],'_samples.sqlite'))
 
-  if(!db && file.exists(fname) && !force)
-    samps <- readRDS(fname)
-  else{
-    samps <- edfR::edf.samples(edf,trials=T,eventmask=T)
+  #don't reload if it's already done
+  if(!force && file.exists(dbname))
+    return(dbname_relative)
 
+  samps <- edfR::edf.samples(obj$edfs[i],trials=T,eventmask=T)
 
-    #if it's not binocular, don't keep all the L/R data
-    if(!obj$binocular){
-      if(all(is.na(samps$paL))){
-        samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
-        data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
+  #if it's not binocular, don't keep all the L/R data
+  if(!obj$binocular){
+    if(all(is.na(samps$paL))){
+      samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
+      data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
 
-      } else{
+    } else{
 
-        samps[,(c("paR","gxR","gyR")) :=NULL]
-        data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
-
-      }
-    }
-
-    #time-shift
-    baseline <- samps[1,time]-1
-    samps[,time := time-baseline]
-
-    if(!db)
-       saveRDS(samps,fname,compress = T)
-
-    else{
-
-      db.pupil = RSQLite::dbConnect(RSQLite::SQLite(),dbname=fname)
-
-      overwrite = F
-
-      if(file.exists(fname) && !force){
-        append=T
-      }
-      else{
-        append = F
-        overwrite = T
-      }
-
-      samps$ID <- id
-
-      #write data to database. Append if file already exists
-      RSQLite::dbWriteTable(conn=db.pupil, name='SAMPLES',samps,overwrite=overwrite,append=append,row.names=F)
-      RSQLite::dbDisconnect(db.pupil)
+      samps[,(c("paR","gxR","gyR")) :=NULL]
+      data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
 
     }
-
   }
 
-  return(fname)
+  #time-shift so samples start at 1
+  baseline <- samps[1,time]-1
+  samps[,time := time-baseline]
+
+  samps$ID <- obj$subs[i]
+
+  #create a separate database file for each subject in sample.dir
+  #one big db would be nice, but can't do in parallel
+
+  db <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=dbname)
+  RSQLite::dbGetQuery(db,'PRAGMA page_size=4096') #increase the page size for increased performance (but a bit more memory)
+  # print(dbGetQuery(db,'PRAGMA page_size'))
+
+  #write all the data into a table called samples
+  RSQLite::dbWriteTable(db,'samples',samps,overwrite=T,append=F,row.names=F)
+
+  #create an index for time and for trial. Makes searching and joining faster
+  RSQLite:: dbGetQuery(db,"CREATE INDEX subtime ON samples (ID,time)")
+  RSQLite::dbGetQuery(db,'CREATE INDEX person ON samples (ID,eyetrial)')
+  RSQLite::dbDisconnect(db)
+
+
+  rm(samps) #clear memory
+  gc()
+
+  print(sprintf('Finished with samples from file %s',obj$edfs[i]))
+
+  return(dbname_relative)
 }
+
+
+# load_sample_file_old <- function(obj,edf,force=FALSE,db=FALSE){
+#
+#    id <- edf2id(edf)
+#
+#    if(!db)
+#     fname <- file.path(obj$sample.dir,paste0(id,'_samp.rds'))
+#    else
+#      fname <- file.path(obj$sample.dir,'samples.sqlite')
+#
+#   if(!db && file.exists(fname) && !force)
+#     samps <- readRDS(fname)
+#   else{
+#     samps <- edfR::edf.samples(edf,trials=T,eventmask=T)
+#
+#
+#     #if it's not binocular, don't keep all the L/R data
+#     if(!obj$binocular){
+#       if(all(is.na(samps$paL))){
+#         samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
+#         data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
+#
+#       } else{
+#
+#         samps[,(c("paR","gxR","gyR")) :=NULL]
+#         data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
+#
+#       }
+#     }
+#
+#     #time-shift
+#     baseline <- samps[1,time]-1
+#     samps[,time := time-baseline]
+#
+#     if(!db)
+#        saveRDS(samps,fname,compress = T)
+#
+#     else{
+#
+#       db.pupil = RSQLite::dbConnect(RSQLite::SQLite(),dbname=fname)
+#
+#       overwrite = F
+#
+#       if(file.exists(fname) && !force){
+#         append=T
+#       }
+#       else{
+#         append = F
+#         overwrite = T
+#       }
+#
+#       samps$ID <- id
+#
+#       #write data to database. Append if file already exists
+#       RSQLite::dbWriteTable(conn=db.pupil, name='SAMPLES',samps,overwrite=overwrite,append=append,row.names=F)
+#       RSQLite::dbDisconnect(db.pupil)
+#
+#     }
+#
+#   }
+#
+#   return(fname)
+# }
 
 
 
@@ -350,4 +403,139 @@ read_saved_samples <- function(fname,ID=NULL,cols = NULL){
 
 
   return(data)
+}
+
+
+
+get_sample_epochs <-function(obj,parallel=T,...){
+
+#create a database with behaivoral data
+db2 <- dbConnect(SQLite(),dbname=file.path(obj$sample.dir,'beh.sqlite'))
+dbWriteTable(db2,'beh',obj$beh,row.names=F,overwrite=T)
+dbGetQuery(db2,'CREATE INDEX person ON beh (ID,eyetrial)')
+dbDisconnect(db2)
+
+if(parallel){
+
+  print('Loading samples (in parallel)...')
+
+
+  #set up cluster with maximum number of cores
+
+  cl <- parallel::makeCluster(ncores)
+  doParallel::registerDoParallel(cl)
+
+  #run with dopar
+  allsamps <- foreach::foreach(edf=iterators::iter(1:length(obj$edfs)),.packages=c('data.table')) %dopar%
+  {
+    fname <- get_avg_epochs(obj,edf,...)
+    fname
+  }
+
+  parallel::stopCluster(cl)
+}
+else{
+
+  #serial method - use lapply
+  allsamps <- lapply(1:length(obj$edfs), function(x) get_avg_epochs(obj,x,...))
+
+}
+
+
+}
+
+get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=c('ID'), agg=T, baseline=NULL,cleanup=F){
+
+  #get the subject ID
+  subID <- z$subs[s]
+
+  #take the header of itrackr object, get only this subject's data
+  #compute 2 variables, for the start and end time relative to the time-locking event
+  tmp <- obj$header
+  tmp <- dplyr::filter(tmp,ID==subID)
+  tmp <- dplyr::filter_(tmp,paste0('!is.na(',event,')'))
+  tmp <- dplyr::arrange(tmp,ID,eyetrial)
+  tmp <- dplyr::mutate_(tmp,'tstart' = paste0(event,'+',epoch[1]),
+                        'tend' = paste0(event,'+',epoch[2]))
+
+  #for our queries, we need our factors as "Task, Conflict", not c("Task", "Conflict")
+  facnames <- paste(factors,collapse = ', ')
+  facnames_beh <- paste('beh.',factors,sep='',collapse=', ')  #to make "beh.Task, beh.Conflict"
+
+  #connect to this subject's database
+  dbname <- z$samples[[s]]
+  db <- RSQLite::dbConnect(SQLite(),dbname=dbname)
+
+
+  #loop through each row of the header, get the start and end time, extract the data we want
+  for(i in 1:nrow(tmp)){
+
+    if(i==1){
+      #first row, create a temporary table called EPOCHS
+      if(RSQLite::dbExistsTable(db,'EPOCHS'))
+        RSQLite::dbGetQuery(db,'DROP TABLE EPOCHS')
+
+      RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE EPOCHS AS SELECT ID,time,eyetrial,pa, time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i,tmp$tstart[i],tmp$tend[i],subID))
+      RSQLite::dbBegin(db) #faster INSERT if we use BEGIN...COMMIT statement
+
+    }else #otherwise, append to the already made EPOCHS table
+      RSQLite::dbGetQuery(db,sprintf('INSERT INTO EPOCHS (ID,time,eyetrial,pa,timepoint,epochnum) SELECT ID,time,eyetrial,pa,time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i, tmp$tstart[i],tmp$tend[i],subID))
+  }
+
+  #COMMIT when done inserting
+  RSQLite::dbCommit(db)
+
+  #if we want our data baselined
+  if(!is.null(baseline)){
+
+    #convert from relative-to-event to relative-to-epoch
+    ep <- epoch[1]:epoch[2]
+    bl <- c(which.max(baseline[1]==ep), which.max(baseline[2]==ep))
+
+    if(!any(bl))
+      stop('Problem with baseline period. This should be relative to your time-locking event, like your epoch')
+
+    #create a new table, BASELINE that holds the baselined pupil data
+    if(RSQLite::dbExistsTable(db,'BASELINE'))
+      dbGetQuery(db,'DROP TABLE BASELINE')
+
+    RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE BASELINE AS SELECT *, (pa-baseline)/baseline as pupil_baseline FROM EPOCHS LEFT JOIN (SELECT ID,eyetrial,AVG(pa) as baseline FROM EPOCHS WHERE timepoint BETWEEN %d and %d GROUP BY epochnum) base ON base.ID=EPOCHS.ID AND base.eyetrial=EPOCHS.eyetrial',bl[1],bl[2]))
+  }
+
+  #for aggregating
+  if(agg){
+    #this holds everyone's behavioral data
+    RSQLite::dbGetQuery(db,'ATTACH "/Users/jason/Desktop/beh.sqlite" as beh')
+
+    if(!is.null(baseline)){
+      #if baselined, merge BASELINE with the behavioral data and compute the average by factors and timepoint
+      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,timepoint, AVG(pupil_baseline) as pupil, AVG(pa) as pupil_raw FROM (SELECT BASELINE.ID,BASELINE.timepoint, BASELINE.eyetrial,BASELINE.pupil_baseline,BASELINE.pa,%s FROM BASELINE INNER JOIN beh ON beh.ID=BASELINE.ID AND beh.eyetrial=BASELINE.eyetrial) GROUP BY %s,timepoint ORDER BY %s',facnames,facnames_beh,facnames,facnames))
+
+    }
+    else{
+      #otherwise, merge EPOCHS with the behavioral data and compute the average by factors and timepoint
+      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,timepoint, AVG(pa) as pupil FROM (SELECT EPOCHS.ID,EPOCHS.timepoint, EPOCHS.eyetrial,EPOCHS.pa,%s FROM EPOCHS INNER JOIN beh ON beh.ID=EPOCHS.ID AND beh.eyetrial=EPOCHS.eyetrial) GROUP BY %s,timepoint ORDER BY %s',facnames,facnames_beh,facnames,facnames))
+    }
+
+    #don't need this anymore
+    RSQLite::dbGetQuery(db,'DETACH beh')
+  }
+  else{
+    #if not aggregating, give me all the data
+    if(!is.null(baseline))
+      res <- RSQLite::dbGetQuery(db,'SELECT * FROM BASELINE')
+    else
+      res <- RSQLite::dbGetQuery(db,'SELECT * FROM EPOCHS')
+  }
+
+  #remove the EPOCHS table
+  if(cleanup){
+    RSQLite::dbGetQuery(db,'DROP TABLE EPOCHS')
+  }
+
+  #disconnect from database
+  RSQLite::dbDisconnect(db)
+
+  return(res)
+
 }
