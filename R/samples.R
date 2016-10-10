@@ -78,7 +78,6 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
 
 
     #set up cluster with maximum number of cores
-
     cl <- parallel::makeCluster(ncores)
     doParallel::registerDoParallel(cl)
 
@@ -88,7 +87,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
       fname <- load_sample_file(obj,edf,force=force)
       fname
     }
-
+    #stop cluster when done
     parallel::stopCluster(cl)
   }
   else{
@@ -111,13 +110,16 @@ load_sample_file <- function(obj,i,force=F){
 
   #create the directory if it doesn't exist
   dir.create(path.expand(obj$sample.dir), showWarnings = FALSE)
+  #full path to file (need for loading .edf)
   dbname <- file.path(path.expand(obj$sample.dir),paste0(obj$subs[i],'_samples.sqlite'))
+  #relative path to file (more convenient)
   dbname_relative <- file.path(obj$sample.dir,paste0(obj$subs[i],'_samples.sqlite'))
 
-  #don't reload if it's already done
+  #don't reload if it's already done and we don't set force=T
   if(!force && file.exists(dbname))
     return(dbname_relative)
 
+  #load the samples
   samps <- edfR::edf.samples(obj$edfs[i],trials=T,eventmask=T)
 
   #if it's not binocular, don't keep all the L/R data
@@ -142,17 +144,15 @@ load_sample_file <- function(obj,i,force=F){
 
   #create a separate database file for each subject in sample.dir
   #one big db would be nice, but can't do in parallel
-
   db <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=dbname)
-  RSQLite::dbGetQuery(db,'PRAGMA page_size=4096') #increase the page size for increased performance (but a bit more memory)
-  # print(dbGetQuery(db,'PRAGMA page_size'))
+  RSQLite::dbSendQuery(db,'PRAGMA page_size=4096') #increase the page size for increased performance (but a bit more memory)
 
   #write all the data into a table called samples
   RSQLite::dbWriteTable(db,'samples',samps,overwrite=T,append=F,row.names=F)
 
   #create an index for time and for trial. Makes searching and joining faster
-  RSQLite:: dbGetQuery(db,"CREATE INDEX subtime ON samples (ID,time)")
-  RSQLite::dbGetQuery(db,'CREATE INDEX person ON samples (ID,eyetrial)')
+  RSQLite:: dbSendQuery(db,"CREATE INDEX subtime ON samples (ID,time)")
+  RSQLite::dbSendQuery(db,'CREATE INDEX person ON samples (ID,eyetrial)')
   RSQLite::dbDisconnect(db)
 
 
@@ -264,8 +264,6 @@ interpolate.gaps <- function(y,gaps)
 
 
 
-
-
 # remove_blinks <- function(obj, interpolate=FALSE)
 # {
 #
@@ -310,6 +308,8 @@ interpolate.gaps <- function(y,gaps)
 #
 #   return(obj)
 # }
+
+
 
 # get_all_epochs <- function(obj,epochname,baseline=NULL,baseline.method='percent',shape='wide',beh='all')
 # {
@@ -482,13 +482,13 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
     if(i==1){
       #first row, create a temporary table called EPOCHS
       if(RSQLite::dbExistsTable(db,'EPOCHS'))
-        RSQLite::dbGetQuery(db,'DROP TABLE EPOCHS')
+        RSQLite::dbSendQuery(db,'DROP TABLE EPOCHS')
 
-      RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE EPOCHS AS SELECT ID,time,eyetrial,pa, time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i,tmp$tstart[i],tmp$tend[i],subID))
+      RSQLite::dbSendQuery(db,sprintf('CREATE TEMPORARY TABLE EPOCHS AS SELECT ID,time,eyetrial,pa, time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i,tmp$tstart[i],tmp$tend[i],subID))
       RSQLite::dbBegin(db) #faster INSERT if we use BEGIN...COMMIT statement
 
     }else #otherwise, append to the already made EPOCHS table
-      RSQLite::dbGetQuery(db,sprintf('INSERT INTO EPOCHS (ID,time,eyetrial,pa,timepoint,epochnum) SELECT ID,time,eyetrial,pa,time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i, tmp$tstart[i],tmp$tend[i],subID))
+      RSQLite::dbSendQuery(db,sprintf('INSERT INTO EPOCHS (ID,time,eyetrial,pa,timepoint,epochnum) SELECT ID,time,eyetrial,pa,time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i, tmp$tstart[i],tmp$tend[i],subID))
   }
 
   #COMMIT when done inserting
@@ -506,15 +506,15 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
 
     #create a new table, BASELINE that holds the baselined pupil data
     if(RSQLite::dbExistsTable(db,'BASELINE'))
-      dbGetQuery(db,'DROP TABLE BASELINE')
+      dbSendQuery(db,'DROP TABLE BASELINE')
 
-    RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE BASELINE AS SELECT *, (pa-baseline)/baseline as pupil_baseline FROM EPOCHS LEFT JOIN (SELECT ID,eyetrial,AVG(pa) as baseline FROM EPOCHS WHERE timepoint BETWEEN %d and %d GROUP BY epochnum) base ON base.ID=EPOCHS.ID AND base.eyetrial=EPOCHS.eyetrial',bl[1],bl[2]))
+    RSQLite::dbSendQuery(db,sprintf('CREATE TEMPORARY TABLE BASELINE AS SELECT *, (pa-baseline)/baseline as pupil_baseline FROM EPOCHS LEFT JOIN (SELECT ID,eyetrial,AVG(pa) as baseline FROM EPOCHS WHERE timepoint BETWEEN %d and %d GROUP BY epochnum) base ON base.ID=EPOCHS.ID AND base.eyetrial=EPOCHS.eyetrial',bl[1],bl[2]))
   }
 
   #for aggregating
   if(aggregate){
     #this holds everyone's behavioral data
-    RSQLite::dbGetQuery(db,'ATTACH "/Users/jason/Desktop/beh.sqlite" as beh')
+    RSQLite::dbSendQuery(db,'ATTACH "/Users/jason/Desktop/beh.sqlite" as beh')
 
     if(!is.null(baseline)){
       #if baselined, merge BASELINE with the behavioral data and compute the average by factors and timepoint
@@ -527,7 +527,7 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
     }
 
     #don't need this anymore
-    RSQLite::dbGetQuery(db,'DETACH beh')
+    RSQLite::dbSendQuery(db,'DETACH beh')
   }
   else{
     #if not aggregating, give me all the data
@@ -539,7 +539,7 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
 
   #remove the EPOCHS table
   if(cleanup){
-    RSQLite::dbGetQuery(db,'DROP TABLE EPOCHS')
+    RSQLite::dbSendQuery(db,'DROP TABLE EPOCHS')
   }
 
   #disconnect from database
