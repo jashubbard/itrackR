@@ -1,7 +1,7 @@
 Package: itrackR
 Type: Package
 Title: itrackR - eyetracking analysis
-Version: 0.1
+Version: 0.9
 Date: 2015-11-09
 Author: Jason Hubbard
 Maintainer: Jason Hubbard <hubbard3@uoregon.edu>
@@ -26,7 +26,7 @@ Imports:
     magrittr,
     data.table,
     edfR,
-    RSQLite,
+    RSQLite (>= 1.0.0),
     Rcpp (>= 0.12.7)
 LinkingTo:
     Rcpp, RcppArmadillo

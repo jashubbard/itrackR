@@ -341,7 +341,7 @@ find_messages <- function(obj,varnames,patterns,numeric.only = FALSE,timestamp=F
 #'
 #' @seealso \code{\link{eyemerge}}
 #'
-add_behdata <- function(obj,beh,append=FALSE){
+add_behdata <- function(obj,beh=NULL,append=FALSE){
 
   if(append){
 
@@ -350,12 +350,16 @@ add_behdata <- function(obj,beh,append=FALSE){
     }
   else{
 
-    eyedata <- obj$header[c('ID','eyetrial',obj$indexvars)]
-#~     eyedata <- cbind(eyedata,obj$header[obj$timevars] - obj$header$starttime)
-    eyedata <- cbind(eyedata,obj$header['starttime'])
+    eyedata <- obj$header[c('ID','eyetrial',obj$indexvars,'starttime')]
+    #~     eyedata <- cbind(eyedata,obj$header[obj$timevars] - obj$header$starttime)
+    # eyedata <- cbind(eyedata,obj$header['starttime'])
 
-    behmerged <- merge(beh,eyedata,by=c('ID',obj$indexvars),all.x=T)
-    obj$beh <- behmerged
+    if(!is.null(beh)){
+      behmerged <- merge(beh,eyedata,by=c('ID',obj$indexvars),all.x=T)
+      obj$beh <- behmerged
+    }
+    else
+      obj$beh <- eyedata
 
     }
 
@@ -405,8 +409,14 @@ add_behdata <- function(obj,beh,append=FALSE){
 #'
 #' @seealso  \code{\link{plot.rois}} \code{\link{radialCoords}}  \code{\link{roiFlower}} \code{\link{calcHits}}
 #'
-makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius=0,xradius=0,yradius=0,angles=NULL,
+makeROIs <- function(obj,coords=NULL,shapes='circle',radius=100,xradius=100,yradius=150,angles=NULL,
                      names=NULL,polygon=data.frame(x=c(),y=c()),append=F){
+
+  if(is.null(coords)){
+    #default to center of the screen
+    coords <- matrix(round(obj$resolution/2),nrow=1)
+
+  }
 
   if(length(shapes)==1 && nrow(coords)>1)
     shapes <- rep(shapes[1],nrow(coords))
@@ -546,10 +556,12 @@ makeROIs <- function(obj,coords=data.frame(x=c(0),y=c(0)),shapes='circle',radius
 #'
 #' @seealso \code{\link{epoch_fixations}} \code{\link{set_index}}
 #'
-eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL,roi=NULL,trialtime = TRUE,condition=NULL,condition.str=FALSE){
+eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event='starttime',roi=NULL,trialtime = TRUE,condition=NULL,condition.str=FALSE){
 
-  if(length(obj$beh)==0)
-    stop('No behavioral data has been added. Did you run add_behdata?')
+  if(length(obj$beh)==0){
+    warning('No behavioral data has been added. Creating dummy behavioral data')
+    obj <- add_behdata(obj)
+  }
 
   #if we're getting epoched fixation data, we already have what we need, just need to grab the right variables, etc.
   if(eyedata=='epoched_fixations'){
@@ -560,7 +572,7 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
     eyes <- obj$epochs$fixations[[event]][[roi]]
     beh <- obj$beh
 
-    realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars))
+    realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars,event))
 
     if(behdata[1] !='all')
       behvars <- intersect(behdata,realbehvars)
@@ -569,7 +581,13 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event=NULL
 
     timevars <- names(eyes)[grepl('^t[_1-9]',names(eyes))]
 
-    eyevars <- c('ID','eyetrial',obj$indexvars,'roi','epoch_start','epoch_end','binwidth','sttime','entime',paste0(roi,'_hit'),timevars)
+    if(is.numeric(roi))
+      hitvar <- paste0('roi_',roi)
+    else
+      hitvar <- paste0(roi,'_hit')
+
+
+    eyevars <- c('ID','eyetrial',obj$indexvars,'roi','epoch_start','epoch_end','binwidth','sttime','entime',hitvar,timevars)
     eyes <- eyes[eyevars]
 
     output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial',obj$indexvars))
@@ -749,7 +767,7 @@ drift_correct <- function(obj,vars=c('ID'),threshold = 10){
   #record what we did
 
   funcall <- list()
-  funcall$eyedata <- eyedata
+  funcall$eyedata <- fixdata
   funcall$vars <- vars
   funcall$threshold <- threshold
 

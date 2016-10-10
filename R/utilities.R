@@ -222,15 +222,20 @@ ind2sub <- function(mat,ind){
   return(list(row=r,col=c))
 }
 
-epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL,type='standard'){
+epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='starttime',type='standard'){
 
   startvar <- 'sttime'
   endvar <- 'entime'
 
-#~   if(is.numeric(roi))
-#~     hitvar <- paste0('roi_',roi)
-#~   else
-    hitvar <- paste0(roi,'_hit')
+   if(is.numeric(roi))
+      hitvar <- paste0('roi_',roi)
+   else
+      hitvar <- paste0(roi,'_hit')
+
+  if(!(hitvar %in% names(obj$fixations))){
+    warning('running calcHits first...')
+    obj <- calcHits(obj,rois=roi,append=T)
+  }
 
   prefix = 't'
   firstbin <- (ceiling(start/binwidth))
@@ -248,10 +253,13 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL,type=
   df <- merge(df,eventdata,by=c('ID','eyetrial'),all.x=T)
   df <- dplyr::arrange(df,fixation_key)
 
-  #convert to "trial time"
-  df[event] <- df[,event] - df$starttime
-  df[startvar] <- df[,startvar] - df$starttime
-  df[endvar] <- df[,endvar] - df$starttime
+  #convert to "trial time" if we're not time locking to beginning of trial
+  if(event !='starttime'){
+    df[event] <- df[,event] - df$starttime
+    df[startvar] <- df[,startvar] - df$starttime
+    df[endvar] <- df[,endvar] - df$starttime
+  }
+
 
   #bin the data based on saccade start time and bin width (in ms)
   df$bin_start <- ceiling((df[,startvar] - df[,event])/binwidth)
@@ -308,6 +316,12 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL,type=
   df$binwidth <- binwidth
   df <- df[,c('ID','eyetrial','fixation_key','roi','epoch_start','epoch_end','binwidth',startvar,endvar,'bin_start','bin_end',event,hitvar,vars)]
 
+  if(length(obj$beh)==0){
+    warning('No behavioral data found. Did you run add_behdata? Creating dummy dataset...')
+    obj <- add_behdata(obj)
+
+  }
+
   df <- merge(obj$beh[c('ID','eyetrial',obj$indexvars)],df,by=c('ID','eyetrial'),all.y=T)
   df <- dplyr::arrange(df,fixation_key)
 
@@ -336,7 +350,7 @@ epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event=NULL,type=
   return(obj)
 }
 
-do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='long',condition="NULL"){
+do_agg_fixations <- function(obj,event='starttime',roi,groupvars=c(),level='group',shape='long',condition="NULL"){
 
   prefix <- 't'
 
@@ -405,7 +419,7 @@ do_agg_fixations <- function(obj,event,roi,groupvars=c(),level='group',shape='lo
   return(dplyr::ungroup(df))
 }
 
-aggregate_fixation_timeseries <- function(obj,event,rois,groupvars=c(),level='group',shape='long',type='probability',condition=NULL,condition.str=FALSE){
+aggregate_fixation_timeseries <- function(obj,event='starttime',rois,groupvars=c(),level='group',shape='long',type='probability',condition=NULL,condition.str=FALSE){
 
   agg <- data.frame()
 

@@ -88,11 +88,11 @@ plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all'
   return(p)
 }
 
-plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level='group',type='probability',condition=NULL){
+plot.timeseries <- function(obj,event='starttime',rois,lines,rows=NULL,cols=NULL,level='group',type='probability',condition=NULL){
 
-  if(is.null(event)){
-    event = 'default_event'
-  }
+  # if(is.null(event)){
+  #   event = 'default_event'
+  # }
 
   condition <- deparse(substitute(condition))
 
@@ -133,7 +133,7 @@ plot.timeseries <- function(obj,event=NULL,rois,lines,rows=NULL,cols=NULL,level=
 
 
 
-  plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=interaction(roi,lines),color=lines,shape=roi,linetype=roi))+
+  plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=interaction(roi,lines),color=lines,shape=factor(roi),linetype=factor(roi)))+
     ggplot2::geom_line() + #size=.75) +
     ggplot2::geom_point(size=1.8) +
     ggplot2::xlab('time (ms)') +
@@ -359,3 +359,59 @@ plot.samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=F,time.st
     return(plt)
 }
 
+
+plot_sample_epochs <- function(epochs,groups=NULL,colors=NULL,rows=NULL,cols=NULL,aggregate=T){
+
+
+  if(is.null(groups) && !is.null(colors))
+    groups <- colors
+
+
+  if(aggregate){
+
+    epochs <- dplyr::group_by_(epochs, .dots = unique(c(groups,colors,rows,cols,'epoch_time'))) %>%
+      dplyr::summarise(pupil = mean(pupil,na.rm=T))
+
+    if(is.null(groups)){
+      groups <- 'groups'
+      epochs$groups <- 1
+    }
+
+  }
+  else{
+    groups <- unique(c('ID',groups))
+  }
+
+  epochs$grouping <- interaction(epochs[,groups])
+
+  if(is.null(colors)){
+    epochs$colors <- epochs$grouping
+  }
+  else
+    epochs$color <- interaction(epochs[,colors])
+
+
+ p <- ggplot2::ggplot(data=epochs, ggplot2::aes(x=epoch_time,y=pupil, group=grouping, color=colors)) +
+   ggplot2::geom_line(size=1.5) + ggplot2::xlab('Time relative to event') + ggplot2::ylab('pupil diameter') + ggplot2::theme_bw() +
+   ggplot2::scale_color_discrete(name=paste(colors,collapse='.'))
+
+ if (!is.null(rows) | !is.null(cols)){
+   rowexp <- do.call('paste',c(as.list(rows),sep=' + '))
+   colexp <- do.call('paste',c(as.list(cols),sep=' + '))
+
+   if(length(rowexp)==0)
+     rowexp='.'
+
+   if(length(colexp)==0)
+     colexp='.'
+
+   facetexp <- paste(rowexp,colexp,sep=" ~ ")
+
+
+   p <- p + ggplot2::facet_grid(facetexp)
+ }
+
+ p
+ return(p)
+
+}
