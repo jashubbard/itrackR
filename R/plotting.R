@@ -88,129 +88,138 @@ plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all'
   return(p)
 }
 
-plot.timeseries <- function(obj,event='starttime',rois,lines,rows=NULL,cols=NULL,level='group',type='probability',condition=NULL){
+# plot.timeseries <- function(obj,event='starttime',rois,lines='ID',rows=NULL,cols=NULL,level='group',type='probability',condition=NULL){
+#
+#   # if(is.null(event)){
+#   #   event = 'default_event'
+#   # }
+#
+#   condition <- deparse(substitute(condition))
+#
+#   agg <- aggregate_fixation_epochs(obj,event=event,
+#                                    rois=rois,
+#                                    groupvars = c(lines,rows,cols),
+#                                    level=level,
+#                                    type=type,
+#                                    condition=condition,
+#                                    condition.str = T)
+#
+#
+#   # agg <- aggregate_fixation_timeseries(obj,event=event,
+#   #                                      rois=rois,
+#   #                                      groupvars = c(lines,rows,cols),
+#   #                                      shape='long',
+#   #                                      level=level,
+#   #                                      type=type,
+#   #                                      condition=condition,
+#   #                                      condition.str = T)
+#
+#   # mainvars <- c('bin','val','roi','epoch_start','epoch_end','binwidth')
+#   # othervars <- names(agg)[-which(names(agg) %in% mainvars)]
+#   #
+#   tmp <- agg
+#   # tmp$bin <- gsub('t','',tmp$bin)
+#   # tmp$bin <- as.numeric(gsub('_','-',tmp$bin))
+#   # tmp$bin <- (tmp$bin)*tmp$binwidth
+#
+#   if(('roi' %in% lines) && (length(lines)>1))
+#     plotlines <- lines[-which('roi' %in% lines)]
+#   else
+#     plotlines <- lines
+#
+#
+#   tmp$lines <- interaction(agg[,plotlines])
+#
+#   if(!is.null(rows)){
+#     tmp$rows <- interaction(agg[,rows])
+#     rowexp <- do.call('paste',c(as.list(rows),sep=' + '))
+#   }
+#
+#   if(!is.null(cols)){
+#     tmp$cols <- interaction(agg[,cols])
+#     colexp <- do.call('paste',c(as.list(cols),sep=' + '))
+#   }
+#
+#
+#
+#   plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=interaction(roi,lines),color=lines,shape=factor(roi),linetype=factor(roi)))+
+#     ggplot2::geom_line() + #size=.75) +
+#     ggplot2::geom_point(size=1.8) +
+#     ggplot2::xlab('time (ms)') +
+#     ggplot2::geom_vline(ggplot2::aes(xintercept = 0), alpha=0.5, linetype='dashed') +
+#     ggplot2::scale_color_discrete(name = toString(lines)) +
+#     ggplot2::scale_x_continuous() #breaks = seq(min(tmp$bin),max(tmp$bin),100))
+#     # using different than default breaks results in too much breaks (at least for me)
+#
+#   if(type == 'difference'){
+#     plt <- plt + ggplot2::geom_hline(yintercept=0,linetype='dashed',alpha=0.7) +
+#             ggplot2::ylab('difference of fixations')
+#   } else if (type == 'logRatio'){
+#     plt <- plt + ggplot2::geom_hline(yintercept=0) +
+#             ggplot2::ylab('log gaze of fixations')
+#   } else if(type == 'proportion') {
+#     plot <- plt + ggplot2::ylab('proportion of fixations')
+#   } else if(type == 'probability') {
+#     plt <- plt + ggplot2::ylab('probability of fixations (%)')
+#   }
+#
+#   if (!is.null(rows) | !is.null(cols)){
+#
+#     if(is.null(rows))
+#       rowexp='.'
+#     if(is.null(cols))
+#       colexp='.'
+#
+#     facetexp <- paste(rowexp,colexp,sep=" ~ ")
+#
+#     plt <- plt + ggplot2::facet_grid(facetexp,labeller = ggplot2::label_both)
+#   }
+#
+#   plt <- plt + ggplot2::theme(panel.background = ggplot2::element_blank(),
+#                               panel.border = ggplot2::element_blank(),
+#                               axis.line.x = ggplot2::element_line(color="black", size = .5),
+#                               axis.line.y = ggplot2::element_line(color="black", size = .5),
+#                               axis.text.x = ggplot2::element_text(size=14,vjust=-0.9),
+#                               axis.title.x = ggplot2::element_text(size=16,vjust=-1.5),
+#                               axis.text.y = ggplot2::element_text(size=14),
+#                               axis.title.y = ggplot2::element_text(size=16,vjust= -1.5),
+#                               panel.grid.major = ggplot2::element_blank(),
+#                               panel.grid.minor = ggplot2::element_blank())
+#
+#     output = list()
+#     output$plt <- plt
+#     output$data <- tmp
+#
+#     plt
+#
+#   return(output)
+# }
 
-  # if(is.null(event)){
-  #   event = 'default_event'
-  # }
-
-  condition <- deparse(substitute(condition))
-
-  agg <- aggregate_fixation_timeseries(obj,event=event,
-                                       rois=rois,
-                                       groupvars = c(lines,rows,cols),
-                                       shape='long',
-                                       level=level,
-                                       type=type,
-                                       condition=condition,
-                                       condition.str = T)
-
-  mainvars <- c('bin','val','roi','epoch_start','epoch_end','binwidth')
-  othervars <- names(agg)[-which(names(agg) %in% mainvars)]
-
-  tmp <- agg
-  tmp$bin <- gsub('t','',tmp$bin)
-  tmp$bin <- as.numeric(gsub('_','-',tmp$bin))
-  tmp$bin <- (tmp$bin)*tmp$binwidth
-
-  if(('roi' %in% lines) && (length(lines)>1))
-    plotlines <- lines[-which('roi' %in% lines)]
-  else
-    plotlines <- lines
-
-
-  tmp$lines <- interaction(agg[,plotlines])
-
-  if(!is.null(rows)){
-    tmp$rows <- interaction(agg[,rows])
-    rowexp <- do.call('paste',c(as.list(rows),sep=' + '))
-  }
-
-  if(!is.null(cols)){
-    tmp$cols <- interaction(agg[,cols])
-    colexp <- do.call('paste',c(as.list(cols),sep=' + '))
-  }
-
-
-
-  plt <- ggplot2::ggplot(data=tmp,ggplot2::aes(x=bin,y=val,group=interaction(roi,lines),color=lines,shape=factor(roi),linetype=factor(roi)))+
-    ggplot2::geom_line() + #size=.75) +
-    ggplot2::geom_point(size=1.8) +
-    ggplot2::xlab('time (ms)') +
-    ggplot2::geom_vline(ggplot2::aes(xintercept = 0), alpha=0.5, linetype='dashed') +
-    ggplot2::scale_color_discrete(name = toString(lines)) +
-    ggplot2::scale_x_continuous() #breaks = seq(min(tmp$bin),max(tmp$bin),100))
-    # using different than default breaks results in too much breaks (at least for me)
-
-  if(type == 'difference'){
-    plt <- plt + ggplot2::geom_hline(yintercept=0,linetype='dashed',alpha=0.7) +
-            ggplot2::ylab('difference of fixations')
-  } else if (type == 'logRatio'){
-    plt <- plt + ggplot2::geom_hline(yintercept=0) +
-            ggplot2::ylab('log gaze of fixations')
-  } else if(type == 'proportion') {
-    plot <- plt + ggplot2::ylab('proportion of fixations')
-  } else if(type == 'probability') {
-    plt <- plt + ggplot2::ylab('probability of fixations (%)')
-  }
-
-  if (!is.null(rows) | !is.null(cols)){
-
-    if(is.null(rows))
-      rowexp='.'
-    if(is.null(cols))
-      colexp='.'
-
-    facetexp <- paste(rowexp,colexp,sep=" ~ ")
-
-    plt <- plt + ggplot2::facet_grid(facetexp,labeller = ggplot2::label_both)
-  }
-
-  plt <- plt + ggplot2::theme(panel.background = ggplot2::element_blank(),
-                              panel.border = ggplot2::element_blank(),
-                              axis.line.x = ggplot2::element_line(color="black", size = .5),
-                              axis.line.y = ggplot2::element_line(color="black", size = .5),
-                              axis.text.x = ggplot2::element_text(size=14,vjust=-0.9),
-                              axis.title.x = ggplot2::element_text(size=16,vjust=-1.5),
-                              axis.text.y = ggplot2::element_text(size=14),
-                              axis.title.y = ggplot2::element_text(size=16,vjust= -1.5),
-                              panel.grid.major = ggplot2::element_blank(),
-                              panel.grid.minor = ggplot2::element_blank())
-
-    output = list()
-    output$plt <- plt
-    output$data <- tmp
-
-    plt
-
-  return(output)
-}
-
-plot_random_epochs <- function(epochs,n=100)
-{
-
-  if('timepoint' %in% names(epochs))
-  {
-    epochs <- dplyr::select(epochs,ID,eyetrial,timepoint,value)
-    epochs <- tidyr::spread(epochs,timepoint,value)
-  }
-
-
-  epochs <- dplyr::select(epochs,matches('^t[_0-9]'))
-
-  firstpoint <- gsub(colnames(epochs)[1],'t','')
-  firstpoint <- as.numeric(gsub(firstpoint,'_','-'))
-
-  lastpoint <- gsub(colnames(epochs)[ncol(epochs)],'t','')
-  lastpoint <- as.numeric(gsub(lastpoint,'_','-'))
-
-  matplot(t(as.matrix(epochs)),type='l',lty=1,axes=FALSE)
-
-  axis(2)
-  axis(1,at=seq(firstpoint,lastpoint,100),labels=seq(firstpoint,lastpoint,100)-(firstpoint))
-  abline(v=firstpoint,col=4,lty=2,lwd=2)
-
-}
+# plot_random_epochs <- function(epochs,n=100)
+# {
+#
+#   if('timepoint' %in% names(epochs))
+#   {
+#     epochs <- dplyr::select(epochs,ID,eyetrial,timepoint,value)
+#     epochs <- tidyr::spread(epochs,timepoint,value)
+#   }
+#
+#
+#   epochs <- dplyr::select(epochs,matches('^t[_0-9]'))
+#
+#   firstpoint <- gsub(colnames(epochs)[1],'t','')
+#   firstpoint <- as.numeric(gsub(firstpoint,'_','-'))
+#
+#   lastpoint <- gsub(colnames(epochs)[ncol(epochs)],'t','')
+#   lastpoint <- as.numeric(gsub(lastpoint,'_','-'))
+#
+#   matplot(t(as.matrix(epochs)),type='l',lty=1,axes=FALSE)
+#
+#   axis(2)
+#   axis(1,at=seq(firstpoint,lastpoint,100),labels=seq(firstpoint,lastpoint,100)-(firstpoint))
+#   abline(v=firstpoint,col=4,lty=2,lwd=2)
+#
+# }
 
 plot.rois <- function(obj,which='all',crosshairs=T){
 
@@ -408,10 +417,82 @@ plot_sample_epochs <- function(epochs,groups=NULL,colors=NULL,rows=NULL,cols=NUL
    facetexp <- paste(rowexp,colexp,sep=" ~ ")
 
 
-   p <- p + ggplot2::facet_grid(facetexp)
+   p <- p + ggplot2::facet_grid(facetexp,labeller=label_both)
  }
 
  p
  return(p)
 
 }
+
+
+plot_fixation_epochs <- function(obj,event='starttime',rois=c(1),groups=('ID'),colors=NULL,rows=NULL,cols=NULL,type='probability',...){
+
+  epochs <- aggregate_fixation_epochs(obj,
+                               event = event,
+                               groupvars = unique(c(groups,colors,rows,cols)),
+                               rois = rois,
+                               type=type,
+                               ...)
+
+
+  if(is.null(groups) && !is.null(colors))
+    groups <- colors
+
+  if(is.null(groups))
+    groups <- 'ID'
+
+
+  epochs$grouping <- interaction(epochs[,unique(c(groups,colors))])
+
+  if(is.null(colors)){
+    epochs$colors <- epochs$grouping
+  }
+  else
+    epochs$color <- interaction(epochs[,colors])
+
+
+  plt <- ggplot2::ggplot(data=epochs, ggplot2::aes(x=timepoint,y=val, group=grouping, color=color,shape=roi)) +
+    ggplot2::geom_line() +
+    ggplot2::geom_point(size=1.8) +
+    ggplot2::geom_vline(ggplot2::aes(xintercept = 0), alpha=0.5, linetype='dashed') +
+    ggplot2::scale_x_continuous() +
+    ggplot2::xlab('Time (binned) relative to event') +
+    ggplot2::ylab('fixation') + ggplot2::theme_bw() +
+    ggplot2::scale_color_discrete(name=paste(colors,collapse='.'))
+
+
+  if(type == 'difference'){
+    plt <- plt + ggplot2::geom_hline(yintercept=0,linetype='dashed',alpha=0.7) +
+      ggplot2::ylab('difference of fixations')
+  } else if (type == 'logRatio'){
+    plt <- plt + ggplot2::geom_hline(yintercept=0) +
+      ggplot2::ylab('log gaze of fixations')
+  } else if(type == 'proportion') {
+    plt <- plt + ggplot2::ylab('proportion of fixations')
+  } else if(type == 'probability') {
+    plt <- plt + ggplot2::ylab('probability of fixations (%)')
+  }
+
+
+  if (!is.null(rows) | !is.null(cols)){
+    rowexp <- do.call('paste',c(as.list(rows),sep=' + '))
+    colexp <- do.call('paste',c(as.list(cols),sep=' + '))
+
+    if(length(rowexp)==0)
+      rowexp='.'
+
+    if(length(colexp)==0)
+      colexp='.'
+
+    facetexp <- paste(rowexp,colexp,sep=" ~ ")
+
+
+    plt <- plt + ggplot2::facet_grid(facetexp,labeller=label_both)
+  }
+
+  plt
+  return(list(plot=plt,data=epochs))
+
+}
+
