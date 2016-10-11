@@ -569,7 +569,9 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event='sta
     if(is.null(event) || is.null(roi))
       stop('You must provide the name of the time-locking event and the ROI')
 
-    eyes <- obj$epochs$fixations[[event]][[roi]]
+    # eyes <- obj$epochs$fixations[[event]][[roi]]
+    eyes <- obj$fixation_epochs[[event]][[roi]]$data
+
     beh <- obj$beh
 
     realbehvars <- setdiff(colnames(beh),c('ID','eyetrial',obj$indexvars,event))
@@ -579,18 +581,27 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event='sta
     else
       behvars <- intersect(colnames(beh),realbehvars)
 
-    timevars <- names(eyes)[grepl('^t[_1-9]',names(eyes))]
+    # timevars <- names(eyes)[grepl('^t[_1-9]',names(eyes))]
+
 
     if(is.numeric(roi))
       hitvar <- paste0('roi_',roi)
     else
       hitvar <- paste0(roi,'_hit')
 
+    numbins <- obj$fixation_epochs[[event]][[roi]]$numbins
 
-    eyevars <- c('ID','eyetrial',obj$indexvars,'roi','epoch_start','epoch_end','binwidth','sttime','entime',hitvar,timevars)
-    eyes <- eyes[eyevars]
+    #create our timeseries based on start and end times
+    fixmatrix <- intervals2matrix(eyes$start_adj,eyes$end_adj,eyes[,hitvar],numbins)
+    colnames(fixmatrix) <- obj$fixation_epochs[[event]][[roi]]$varnames
+    eyes <- cbind(eyes,fixmatrix)
 
-    output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial',obj$indexvars))
+
+
+    # eyevars <- c('ID','eyetrial',obj$indexvars,'roi','epoch_start','epoch_end','binwidth','sttime','entime',hitvar,timevars)
+    # eyes <- eyes[eyevars]
+
+    output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
     output <- dplyr::arrange(output,ID,eyetrial)
   }
   else{
