@@ -1,8 +1,8 @@
 ## ----results="hide",message=FALSE----------------------------------------
 library(itrackR)
-datapath <- itrackR.data('path')
-edf_files <- itrackR.data('edfs')
-beh <- itrackR.data('beh')
+datapath <- itrackr.data('path')
+edf_files <- itrackr.data('edfs')
+beh <- itrackr.data('beh')
 
 
 ## ------------------------------------------------------------------------
@@ -43,14 +43,14 @@ angles <- roiFlower(12)
 
 #make elliptical ROIs and plot them
 z <- makeROIs(z,innercoords,shape='ellipse',xradius=60, yradius=120, angles=angles[c(1,3,5,7,9,11)])
-plot.rois(z)
+plot_rois(z)
 
 
 ## ---- fig.width=5, fig.height=4------------------------------------------
 
 #make elliptical ROIs and plot them
 z <- makeROIs(z,outercoords,shape='ellipse',xradius=60, yradius=120, angles=angles[c(2,4,6,8,10,12)], names=7:12, append=T)
-plot.rois(z)
+plot_rois(z)
 
 
 ## ----fig.width=5, fig.height=4-------------------------------------------
@@ -59,12 +59,16 @@ plot.rois(z)
 centercoords <- matrix(c(512,384),nrow=1)
 
 z <- makeROIs(z,centercoords,shapes='circle',radius=65, names=13, append=T)
-plot.rois(z)
+plot_rois(z)
 
 
 
 ## ---- fig.show='hold', fig.width=6, fig.height=4-------------------------
 plot(z, zoom=TRUE)
+
+## ----fig.show='hold',fix.width=4,fig.height=4----------------------------
+plot(z,zoom=TRUE,oneplot=TRUE)
+
 
 ## ------------------------------------------------------------------------
 knitr::kable(head(z$header, 10))
@@ -84,6 +88,10 @@ knitr::kable(head(z$beh, 10))
 
 ## ------------------------------------------------------------------------
 knitr::kable(head(z$header, 10))
+
+## ----fig.show='hold',fix.width=4,fig.height=4----------------------------
+plot(z,zoom=TRUE,oneplot=TRUE, condition = Block<=5)
+
 
 ## ----fig.width=6, fig.height=4-------------------------------------------
 z <- drift_correct(z,vars='Block',threshold=15)
@@ -112,20 +120,29 @@ fixes_all <- eyemerge(z,'fixations',all.rois = T)
 
 
 ## ------------------------------------------------------------------------
+fixes_first5 <- eyemerge(z,'fixations',condition = Block <= 5)
+max(fixes_first5$Block,na.rm=T)
+
+
+## ------------------------------------------------------------------------
 #start at stimulus onset, going 700ms after that point. Bin the data into 25ms time bins.
-z <- epoch_fixations(z,'target',event='STIMONSET',start = 0, end = 700, binwidth = 25)
-z <- epoch_fixations(z,'distractor',event='STIMONSET',start = 0, end = 700, binwidth = 25)
+#repeate for the target and the distractor ROIs we created
+z <- epoch_fixations(z,c('target','distractor'),event='STIMONSET',start = 0, end = 700, binwidth = 25)
 
 ## ----fig.width=7, fig.height=4-------------------------------------------
 #plot the timeseries data for fixations to target, separately for the Conflict and Task conditions
-plot.timeseries(z,event='STIMONSET',rois=c('target'),lines=c('Conflict'),cols='Task')
+plot_fixation_epochs(z,event='STIMONSET',rois=c('target'),group=c('Conflict'),cols='Task')
+
 
 #plot fixations to target and disctractor for the same conditions
 #you must specify 'roi' as one of the plotting variables for it to work.
-plot.timeseries(z,event='STIMONSET',rois=c('target','distractor'),lines=c('roi','Conflict'),cols='Task')
+plot_fixation_epochs(z,event='STIMONSET',rois=c('target','distractor'),group=c('roi','Conflict'),color='Conflict',cols='Task')
 
 #plot difference waves (target - distractor fixations). Plot on separate rows insetead of columns.
 #This example doesn't make much sense because distractors aren't present on no-conflict trials
-plot.timeseries(z,event='STIMONSET',rois=c('target','distractor'),lines=c('Conflict'),rows='Task',type='difference')
+plot_fixation_epochs(z,event='STIMONSET',rois=c('target','distractor'),group=c('roi','Conflict'),rows='Task',type='difference')
+
+#Repeat, but on a subset of the data. Say only when Conflict==1
+plot_fixation_epochs(z,event='STIMONSET',rois=c('target','distractor'),group=c('roi','Conflict'),rows='Task',type='difference',condition = Conflict==1)
 
 
