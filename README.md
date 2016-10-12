@@ -1,7 +1,26 @@
 itrackR Basics
 ================
 Jason Hubbard
-2016-10-12
+
+
+
+itrackR is an R package for high-level analyses of eyetracking data. For now it is only compatible with EDF files from SR-Research Eyelink eyetrackers. **This is currently a work-in-progress.** Some functions are missing documentation, but you can see an example of a full analysis with `vignette('itrackR')`. You will first need to install SR Research's API, found here: (https://www.sr-support.com/forumdisplay.php?17-EyeLink-Display-Software) and the [edfR](http://github.com/jashubbard/edfR) package in order to import the edf files. These aren't on CRAN yet, so everything should be installed via [devtools](https://cran.r-project.org/web/packages/devtools/index.html):
+
+```r
+install.packages('devtools')
+devtools::install_github('jashubbard/itrackR')
+```
+--- 
+
+
+###NEWS (10-12-2016)
+- Version 0.9
+- Some documentation now included. 
+- Totally revamped code for handling pupil data (using a sqlite backend)
+- Total rewrite of epoching, aggregating, and plotting fixations
+
+---- 
+
 
 This will acquaint you with some of the basics of itrackR. There are a number of function for doing high-level analyses of eyetracking data.
 
