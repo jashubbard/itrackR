@@ -114,17 +114,22 @@ plot_rois <- function(obj,which='all',crosshairs=T){
   return(p)
 }
 
-plot_samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=T,time.start=NULL,time.end=NULL){
+plot_samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=T,nbins=15,pages=NULL,time.start=NULL,time.end=NULL){
 
-  #load sample data if you haven't already
-  obj <- check_for_samples(obj)
+  # #load sample data if you haven't already
+  # obj <- check_for_samples(obj)
+  #
+  # #find the appropriate file that matches the ID you want
+  # sampfile <- unlist(obj$samples[grepl(ID,obj$samples)])
+  #
+  # #load in sample data
+  # samps <- readRDS(sampfile)
+  # samps <- as.data.frame(samps)
 
-  #find the appropriate file that matches the ID you want
-  sampfile <- unlist(obj$samples[grepl(ID,obj$samples)])
 
-  #load in sample data
-  samps <- readRDS(sampfile)
-  samps <- as.data.frame(samps)
+  samps <- get_samples(z,104,fields=c('time','pa','blink','fixation'))
+
+
   samps$index <- 1:nrow(samps)
 
   timestart <- samps$time[1]
@@ -144,8 +149,14 @@ plot_samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=T,time.st
   samps <- subset(samps,time>=range_start & time<=range_end)
 
   #for now, bin our sample data into 10 equal bins
-  samps$bin <- findInterval(1:nrow(samps),seq(1,nrow(samps),nrow(samps)/10))
+  samps$bin <- findInterval(1:nrow(samps),seq(1,nrow(samps),nrow(samps)/nbins))
 
+
+  if(!is.null(pages)){
+    samps <- subset(samps,bin %in% pages)
+    range_start <- min(samps$time)
+    range_end <- max(samps$time)
+  }
 
   plt <- ggplot2::ggplot()
 
@@ -228,8 +239,8 @@ plot_samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=T,time.st
                               panel.grid.major = ggplot2::element_blank(),
                               panel.grid.minor = ggplot2::element_blank())
 
-    if(bin)
-      plt <- plt + ggplot2::facet_wrap(~bin,ncol=1,scales = 'free_x') + ggplot2::ylab('pupil size (arbitrary units)') + ggplot2::scale_x_continuous(name='time (seconds)',breaks=xbreaks,labels=xlabels)
+    if(bin && !is.null(page))
+      plt <- plt + ggplot2::facet_wrap(~bin,ncol=1,scales = 'free_x',labeller = ggplot2::label_both) + ggplot2::ylab('pupil size (arbitrary units)') + ggplot2::scale_x_continuous(name='time (seconds)',breaks=xbreaks,labels=xlabels)
 
     plt
 
@@ -252,14 +263,16 @@ plot_sample_epochs <- function(epochs,groups=NULL,colors=NULL,rows=NULL,cols=NUL
     if(is.null(groups)){
       groups <- 'groups'
       epochs$groups <- 1
+      colors <- groups
     }
 
-  }
-  else{
-    groups <- unique(c('ID',groups))
+    #
+    # else{
+    #   groups <- unique(c('ID',groups))
+    # }
   }
 
-  epochs$grouping <- interaction(epochs[,groups])
+  epochs$grouping <- interaction(epochs[,unique(c(groups,colors))])
 
   if(is.null(colors)){
     epochs$colors <- epochs$grouping
@@ -268,7 +281,7 @@ plot_sample_epochs <- function(epochs,groups=NULL,colors=NULL,rows=NULL,cols=NUL
     epochs$color <- interaction(epochs[,colors])
 
 
- p <- ggplot2::ggplot(data=epochs, ggplot2::aes(x=epoch_time,y=pupil, group=grouping, color=colors)) +
+ p <- ggplot2::ggplot(data=epochs, ggplot2::aes(x=epoch_time,y=pupil, group=grouping, color=color)) +
    ggplot2::geom_line(size=1.5) + ggplot2::xlab('Time relative to event') + ggplot2::ylab('pupil diameter') + ggplot2::theme_bw() +
    ggplot2::scale_color_discrete(name=paste(colors,collapse='.'))
 

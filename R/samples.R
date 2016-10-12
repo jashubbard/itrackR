@@ -413,10 +413,10 @@ if(length(obj$beh)==0)
   obj <- add_behdata(obj)
 
 #create a database with behaivoral data
-db2 <- DBI::dbConnect(RSQLite::SQLite(),dbname=file.path(obj$sample.dir,'beh.sqlite'))
-DBI::dbWriteTable(db2,'beh',as.data.frame(obj$beh),row.names=F,overwrite=T)
-DBI::dbGetQuery(db2,'CREATE INDEX person ON beh (ID,eyetrial)')
-DBI::dbDisconnect(db2)
+db2 <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=file.path(path.expand(obj$sample.dir),'beh.sqlite'))
+RSQLite::dbWriteTable(db2,'beh',as.data.frame(obj$beh),row.names=F,overwrite=T)
+RSQLite::dbGetQuery(db2,'CREATE INDEX person ON beh (ID,eyetrial)')
+RSQLite::dbDisconnect(db2)
 
 if(parallel){
 
@@ -514,7 +514,7 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
   #for aggregating
   if(aggregate){
     #this holds everyone's behavioral data
-    RSQLite::dbSendQuery(db,'ATTACH "/Users/jason/Desktop/beh.sqlite" as beh')
+    RSQLite::dbSendQuery(db,sprintf('ATTACH "%s" as beh', file.path(path.expand(obj$sample.dir),'beh.sqlite')))
 
     if(!is.null(baseline)){
       #if baselined, merge BASELINE with the behavioral data and compute the average by factors and timepoint
