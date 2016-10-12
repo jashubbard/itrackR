@@ -1,10 +1,10 @@
 ---
-title: "itrackR Basics"
+title: "itrackR"
 author: "Jason Hubbard"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{itrackR}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---

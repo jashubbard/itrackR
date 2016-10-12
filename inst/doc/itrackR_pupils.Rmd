@@ -1,0 +1,120 @@
+---
+title: "itrackR Pupils"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{itrackR Pupils}
+  %\VignetteEncoding{UTF-8}
+---
+
+##itrackR basics for pupillometry
+
+This will acquaint you with the basic functions for dealing with sample (i.e. pupil) data from your edf files. The basic approach is to load the sample data, epoching it around some time-locking event, and averaging based on some factors in your experiment. 
+
+##Example Data
+Some sample data is included with itrackR. This includes 2 EDF files from an SR-Research Eyetracker, and a behavioral file (saved as a .rds). You can load them using `itrackR.data`:
+
+```{r,results="hide",message=FALSE}
+library(itrackR)
+datapath <- itrackr.data('path')
+edf_files <- itrackr.data('edfs')
+beh <- itrackr.data('beh')
+
+z <- itrackr(edfs=edf_files)
+```
+
+##Adding behavioral data
+As we did in the main analysis, we extract the timestamps of particular events of interest (like STIMONSET), and also events indicating our index variables (Block and Trial) for merging with behavioral data. 
+
+```{r}
+z <- find_messages(z,'STIMONSET','STIMONSET',timestamp = T)
+z <- set_index(z,c('Block','Trial'),c('^BLOCK [0-9]*','TRIAL [0-9]*'),numeric.only = T)
+z <- add_behdata(z,itrackr.data('beh'))
+```
+
+###Loading sample data
+By default the sample data is not loaded because it can be huge (for an hour long experiment at 1000Hz, it can be around 2.5 million data points). To access it, we use `load_samples`. This loads the sample data, and saves a file on the hard drive for each subject, which is an sqlite database containing all the information. This reduces the amount of RAM needed to deal with the data. If we don't provide an argument for `outdir`, these files are saved in a temporary directory. But for convenience it's better to specify a folder. To speed things up, we can load them in parallel, and specify the number cores we want to use on our computer to do so (default = 2). 
+
+```{r}
+z <- load_samples(z,outdir=datapath,parallel=T,ncores=2,force=T)
+
+#see what your directory is..
+z$sample.dir
+```
+
+Plotting the raw sample data can be tricky because the timeseries is so long. The function `plot_samples` helps with this. To make it usable, by default it breaks the timeseries into 15 equal bins and plots each into a separate panel. Unless you have a huge monitor this is difficult to visualize in R. Use the `pages` argument to visualize only a few bins at a time. You can also control the number of bins using the `nbins` argument. This only visualizes a single subject's data at a time. We can also visualize blinks and fixations using the `events` argument. Fixation periods are depicted in green, blink periods are in red. 
+
+```{r}
+
+plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
+```
+
+Obviously we have lots of blinks. We would like to remove these. We can do this using `remove_blinks`. We can optionally interpolate the data to remove the blank perdiods after removing. This also works in parallel at first, using 2 cores. If you computer has more processors, you can increase this using the `ncores` argument. You can turn off parallel processing with `parallel=FALSE`. 
+
+```{r}
+
+z <- remove_blinks(z, interpolate=F)
+```
+
+Now let's visualize the same pupil data. Much better!
+
+```{r}
+
+plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
+```
+
+NOTE: if you call `load_samples` again, you'll notice it goes very quickly. By default it does not actually reload the data if it finds a database (the paths are stored in `z$samples`). You can force it to reload by using the `force` argument. 
+
+```{r}
+
+#force it to reload
+z <- load_samples(z,outdir=z$sample.dir,force=T)
+
+```
+
+
+
+```{r}
+#the blinks are back!
+plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
+```
+
+Now let's interpolate when we remove the blinks, so there are no gaps. While we're at it, we can also visualize the timestamps of when the stimulus onset occurs using the `timestamp` argument: 
+
+```{r}
+#the blinks are back!
+z <- remove_blinks(z,interpolate=T)
+plot_samples(z,ID=104, nbins = 35, pages=2:3, events = F, timestamp = 'STIMONSET')
+```
+
+###Epoching pupil data
+
+Now we want to actually use the data let's create epochs around some event of interest (say stimulus onset), then average them together based on our different task factors (say Task and Conflict). First we grab the epoched pupil data using `get_sample_epochs`. This works in parallel like the other functions. It returns a data frame with our epoched pupil data combined with the behavioral data you want. You can specify these variables using the `factors` argument. If the `aggregate` argument is TRUE (default) then it will compute the average timeseries, first within subjects for each combination of our factors. If `aggregate` is FALSE, then it will return all trials. This can be a lot of data if you have a large epoch. You can specify your time-locking event of interest using `event` (the default is the beginning of the trial) and the epoch relative to that event (e.g. `c(-500, 200)` will start 500 samples before and go 200 samples after the event). The default epoch is `c(-100,100)`.  
+
+```{r}
+
+epochs <- get_sample_epochs(z,factors=c('Task','Conflict'), event='STIMONSET', epoch = c(-500,300), aggregate=T)
+
+knitr::kable(head(epochs, 10))
+```
+
+
+We can plot these averaged epochs using `plot_sample_epochs`. We can specify which variables determine the `groups` (separate lines), `colors`, facet `rows` and `cols`. The `aggregate` argument here is to determine whether we want to average across subjects. 
+
+```{r}
+plot_sample_epochs(epochs,groups=c('Task'),colors = 'Conflict',rows='Task',aggregate=T)
+```
+
+
+Note that the units are funny. These are the arbitrary units spit out by Eyelink. It is good practice to choose a baseline period at the beginning of each epoch and compute the percent change from that window. We can do this using `get_sample_epochs` and the `baseline` argument, specifing the time window relative to our event that serves as the baseline. Here we choose the first 100 ms of the epoch and re-plot.
+
+```{r}
+
+#get epochs again, this time baselining each trial 
+epochs <- get_sample_epochs(z,factors=c('Task','Conflict'), event='STIMONSET', epoch = c(-500,300), aggregate=T, baseline = c(-500,-400))
+
+#notice the plots are different
+plot_sample_epochs(epochs,groups=c('Task'),colors = 'Conflict',rows='Task',aggregate=T)
+
+```
+
