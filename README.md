@@ -8,9 +8,12 @@ itrackR is an R package for high-level analyses of eyetracking data. For now it 
 
 ```r
 install.packages('devtools')
-devtools::install_github('jashubbard/itrackR')
+#build_vignettes takes a long time. Set to FALSE if you don't need them. 
+devtools::install_github('jashubbard/itrackR', build_vignettes=TRUE)
 ```
 --- 
+
+
 
 
 ###NEWS (10-12-2016)

@@ -17,7 +17,7 @@ z <- load_samples(z,outdir=datapath,parallel=T,ncores=2,force=T)
 #see what your directory is..
 z$sample.dir
 
-## ------------------------------------------------------------------------
+## ----fig.width=7, fig.height=4-------------------------------------------
 
 plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
 
@@ -25,7 +25,7 @@ plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
 
 z <- remove_blinks(z, interpolate=F)
 
-## ------------------------------------------------------------------------
+## ----fig.width=7, fig.height=4-------------------------------------------
 
 plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
 
@@ -35,12 +35,12 @@ plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
 z <- load_samples(z,outdir=z$sample.dir,force=T)
 
 
-## ------------------------------------------------------------------------
+## ----fig.width=7, fig.height=4-------------------------------------------
 #the blinks are back!
 plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
 
-## ------------------------------------------------------------------------
-#the blinks are back!
+## ----fig.width=7, fig.height=4-------------------------------------------
+
 z <- remove_blinks(z,interpolate=T)
 plot_samples(z,ID=104, nbins = 35, pages=2:3, events = F, timestamp = 'STIMONSET')
 
@@ -50,10 +50,10 @@ epochs <- get_sample_epochs(z,factors=c('Task','Conflict'), event='STIMONSET', e
 
 knitr::kable(head(epochs, 10))
 
-## ------------------------------------------------------------------------
+## ----fig.width=7, fig.height=4-------------------------------------------
 plot_sample_epochs(epochs,groups=c('Task'),colors = 'Conflict',rows='Task',aggregate=T)
 
-## ------------------------------------------------------------------------
+## ----fig.width=7, fig.height=4-------------------------------------------
 
 #get epochs again, this time baselining each trial 
 epochs <- get_sample_epochs(z,factors=c('Task','Conflict'), event='STIMONSET', epoch = c(-500,300), aggregate=T, baseline = c(-500,-400))

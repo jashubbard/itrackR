@@ -42,9 +42,9 @@ z <- load_samples(z,outdir=datapath,parallel=T,ncores=2,force=T)
 z$sample.dir
 ```
 
-Plotting the raw sample data can be tricky because the timeseries is so long. The function `plot_samples` helps with this. To make it usable, by default it breaks the timeseries into 15 equal bins and plots each into a separate panel. Unless you have a huge monitor this is difficult to visualize in R. Use the `pages` argument to visualize only a few bins at a time. You can also control the number of bins using the `nbins` argument. This only visualizes a single subject's data at a time. We can also visualize blinks and fixations using the `events` argument. Fixation periods are depicted in green, blink periods are in red. 
+Plotting the raw sample data can be tricky because the timeseries is so long. The function `plot_samples` helps with this. To make it usable, by default it breaks the timeseries into 15 equal bins and plots each into a separate panel. Unless you have a huge monitor this is difficult to visualize in R. Use the `pages` argument to visualize only a few bins at a time. You can also control the number of bins using the `nbins` argument. This only visualizes a single subject's data at a time. We can also visualize blinks and fixations using the `events` argument. Fixation periods are depicted in green, blink periods are in red. The mean pupil diameter across the entire session is depicted as a horizontal dotted line. 
 
-```{r}
+```{r fig.width=7, fig.height=4}
 
 plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
 ```
@@ -58,7 +58,7 @@ z <- remove_blinks(z, interpolate=F)
 
 Now let's visualize the same pupil data. Much better!
 
-```{r}
+```{r fig.width=7, fig.height=4}
 
 plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
 ```
@@ -74,15 +74,15 @@ z <- load_samples(z,outdir=z$sample.dir,force=T)
 
 
 
-```{r}
+```{r fig.width=7, fig.height=4}
 #the blinks are back!
 plot_samples(z,ID=104, nbins = 35, pages=2:3, events = T)
 ```
 
 Now let's interpolate when we remove the blinks, so there are no gaps. While we're at it, we can also visualize the timestamps of when the stimulus onset occurs using the `timestamp` argument: 
 
-```{r}
-#the blinks are back!
+```{r fig.width=7, fig.height=4}
+
 z <- remove_blinks(z,interpolate=T)
 plot_samples(z,ID=104, nbins = 35, pages=2:3, events = F, timestamp = 'STIMONSET')
 ```
@@ -101,14 +101,14 @@ knitr::kable(head(epochs, 10))
 
 We can plot these averaged epochs using `plot_sample_epochs`. We can specify which variables determine the `groups` (separate lines), `colors`, facet `rows` and `cols`. The `aggregate` argument here is to determine whether we want to average across subjects. 
 
-```{r}
+```{r fig.width=7, fig.height=4}
 plot_sample_epochs(epochs,groups=c('Task'),colors = 'Conflict',rows='Task',aggregate=T)
 ```
 
 
 Note that the units are funny. These are the arbitrary units spit out by Eyelink. It is good practice to choose a baseline period at the beginning of each epoch and compute the percent change from that window. We can do this using `get_sample_epochs` and the `baseline` argument, specifing the time window relative to our event that serves as the baseline. Here we choose the first 100 ms of the epoch and re-plot.
 
-```{r}
+```{r fig.width=7, fig.height=4}
 
 #get epochs again, this time baselining each trial 
 epochs <- get_sample_epochs(z,factors=c('Task','Conflict'), event='STIMONSET', epoch = c(-500,300), aggregate=T, baseline = c(-500,-400))
