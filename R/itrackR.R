@@ -40,7 +40,7 @@ itrackr <- function(edfs = NULL,path=NULL,pattern='*.edf',resolution=c(1024,768)
               blinks = data.frame(),
               messages = data.frame(),
               rois = list(),
-              epochs = list(),
+              fixation_epochs = list(),
               beh = data.frame(),
               transform = list(),
               history = list(step=0)

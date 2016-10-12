@@ -7,9 +7,9 @@ radialCoords <- function(x,y,numpoints,radius,starting_angle=0){
 
   for(i in 1:numpoints){
 
-   angle <- (i-1)*(360/numpoints)+starting_angle
-   coords[i,1] <- ceiling(x+sin((angle*pi)/180)*radius)
-   coords[i,2] <- ceiling(y+cos((angle*pi)/180)*radius)
+    angle <- (i-1)*(360/numpoints)+starting_angle
+    coords[i,1] <- ceiling(x+sin((angle*pi)/180)*radius)
+    coords[i,2] <- ceiling(y+cos((angle*pi)/180)*radius)
 
   }
 
@@ -58,7 +58,7 @@ calcHits_fixations <- function(obj,rois='all',append=FALSE){
   names(hits)[-1] <- allnames
 
   for(i in 1:length(allrois)){
-   hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$fixations$gavx,obj$fixations$gavy,allrois[[i]]))
+    hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$fixations$gavx,obj$fixations$gavy,allrois[[i]]))
   }
 
   hits <- hits[,c('fixation_key',allnames)]
@@ -222,117 +222,96 @@ ind2sub <- function(mat,ind){
   return(list(row=r,col=c))
 }
 
-epoch_fixations <- function(obj,roi,start=0,end=700,binwidth=25,event='starttime',type='standard'){
+epoch_fixations <- function(obj,rois=c(1),start=0,end=700,binwidth=25,event='starttime',type='standard'){
 
-  startvar <- 'sttime'
-  endvar <- 'entime'
+  for(roi in rois){
+    startvar <- 'sttime'
+    endvar <- 'entime'
 
-   if(is.numeric(roi))
+    if(is.numeric(roi))
       hitvar <- paste0('roi_',roi)
-   else
+    else
       hitvar <- paste0(roi,'_hit')
 
-  if(!(hitvar %in% names(obj$fixations))){
-    warning('running calcHits first...')
-    obj <- calcHits(obj,rois=roi,append=T)
+    if(!(hitvar %in% names(obj$fixations))){
+      warning('running calcHits first...')
+      obj <- calcHits(obj,rois=roi,append=T)
+    }
+
+    prefix = 't'
+    firstbin <- (ceiling(start/binwidth))
+    numbins = ((end - start)/binwidth)+1
+    lastbin <- firstbin + numbins-1
+
+    if(is.null(event)){
+      obj$header$default_event = obj$header$starttime
+      event = 'default_event'
+    }
+
+    eventdata <- obj$header[,unique(c('ID','eyetrial','starttime',event))]
+
+    df <- obj$fixations[,c('ID','eyetrial','fixation_key',startvar,endvar,hitvar)]
+    df <- merge(df,eventdata,by=c('ID','eyetrial'),all.x=T)
+    df <- dplyr::arrange(df,fixation_key)
+
+    #convert to "trial time" if we're not time locking to beginning of trial
+    if(event !='starttime')
+      df[event] <- df[,event] - df$starttime
+
+    df[startvar] <- df[,startvar] - df$starttime
+    df[endvar] <- df[,endvar] - df$starttime
+
+    #bin the data based onstart time and bin width (in ms)
+    df$bin_start <- ceiling((df[,startvar] - df[,event])/binwidth)
+
+    if(type=='cumulative'){
+      df$bin_end <- NA
+      df$bin_end[df$bin_start>=firstbin & df$bin_start<=lastbin] <- lastbin
+    }
+    else
+      df$bin_end <- ceiling((df[,endvar] - df[,event])/binwidth)
+
+    #have a column for the bin width (easier for plotting later)
+    df$binwidth <- binwidth
+
+    #throw out before stim onset and after numbins
+    df <- subset(df,bin_start>=firstbin & bin_end<=lastbin)
+
+    #convert to "trial time"
+    #~   df[startvar] <- df[,startvar] - df$starttime
+    #~   df[endvar] <- df[,endvar] - df$starttime
+
+    if(start<=0){
+      df$start_adj = df$bin_start + abs(firstbin)+1
+      df$end_adj = df$bin_end + abs(firstbin)+1
+      # intervals <- apply(cbind(start_adj,end_adj),1,function(x) x[1]:x[2])
+    }
+    else {
+      df$start_adj <- df$bin_start
+      df$end_adj <- df$bin_end
+
+    }
+
+
+    # vectors <- intervals2matrix(start_adj,end_adj,df[,hitvar],numbins)
+
+    vars = gsub('-','_',paste0(prefix,seq(firstbin*binwidth,lastbin*binwidth,binwidth)))
+    # df[vars] <- vectors
+
+    if(is.null(obj$epochs$fixations[[event]]))
+      obj$epochs$fixations[[event]] <- list()
+
+    obj$fixation_epochs[[event]][[roi]] <- list()
+    obj$fixation_epochs[[event]][[roi]]$data <- df[c('ID','eyetrial','fixation_key','binwidth','bin_start','bin_end','start_adj','end_adj',hitvar)]
+    obj$fixation_epochs[[event]][[roi]]$roi <- roi
+    obj$fixation_epochs[[event]][[roi]]$epoch <- c(start,end)
+    obj$fixation_epochs[[event]][[roi]]$binwidth <- binwidth
+    obj$fixation_epochs[[event]][[roi]]$firstbin <- firstbin
+    obj$fixation_epochs[[event]][[roi]]$lastbin <- lastbin
+    obj$fixation_epochs[[event]][[roi]]$numbins <- numbins
+    obj$fixation_epochs[[event]][[roi]]$varnames <- vars
+
   }
-
-  prefix = 't'
-  firstbin <- (ceiling(start/binwidth))
-  numbins = ((end - start)/binwidth)+1
-  lastbin <- firstbin + numbins-1
-
-  if(is.null(event)){
-    obj$header$default_event = obj$header$starttime
-    event = 'default_event'
-  }
-
-  eventdata <- obj$header[,unique(c('ID','eyetrial','starttime',event))]
-
-  df <- obj$fixations[,c('ID','eyetrial','fixation_key',startvar,endvar,hitvar)]
-  df <- merge(df,eventdata,by=c('ID','eyetrial'),all.x=T)
-  df <- dplyr::arrange(df,fixation_key)
-
-  #convert to "trial time" if we're not time locking to beginning of trial
-  if(event !='starttime')
-    df[event] <- df[,event] - df$starttime
-
-  df[startvar] <- df[,startvar] - df$starttime
-  df[endvar] <- df[,endvar] - df$starttime
-
-  #bin the data based onstart time and bin width (in ms)
-  df$bin_start <- ceiling((df[,startvar] - df[,event])/binwidth)
-
-  if(type=='cumulative'){
-    df$bin_end <- NA
-    df$bin_end[df$bin_start>=firstbin & df$bin_start<=lastbin] <- lastbin
-  }
-  else
-    df$bin_end <- ceiling((df[,endvar] - df[,event])/binwidth)
-
-  #throw out before stim onset and after numbins
-  df <- subset(df,bin_start>=firstbin & bin_end<=lastbin)
-
-  #convert to "trial time"
-#~   df[startvar] <- df[,startvar] - df$starttime
-#~   df[endvar] <- df[,endvar] - df$starttime
-
-  if(start<=0){
-    df$start_adj = df$bin_start + abs(firstbin)+1
-    df$end_adj = df$bin_end + abs(firstbin)+1
-    # intervals <- apply(cbind(start_adj,end_adj),1,function(x) x[1]:x[2])
-  }
-  else {
-    df$start_adj <- df$bin_start
-    df$end_adj <- df$bin_end
-
-  }
-
-
-  # vectors <- intervals2matrix(start_adj,end_adj,df[,hitvar],numbins)
-
-  vars = gsub('-','_',paste0(prefix,firstbin:lastbin))
-  # df[vars] <- vectors
-
-  if(is.null(obj$epochs$fixations[[event]]))
-    obj$epochs$fixations[[event]] <- list()
-
-  obj$fixation_epochs[[event]][[roi]] <- list()
-  obj$fixation_epochs[[event]][[roi]]$data <- df[c('ID','eyetrial','fixation_key','bin_start','bin_end','start_adj','end_adj',hitvar)]
-  obj$fixation_epochs[[event]][[roi]]$roi <- roi
-  obj$fixation_epochs[[event]][[roi]]$epoch <- c(start,end)
-  obj$fixation_epochs[[event]][[roi]]$binwidth <- binwidth
-  obj$fixation_epochs[[event]][[roi]]$firstbin <- firstbin
-  obj$fixation_epochs[[event]][[roi]]$lastbin <- lastbin
-  obj$fixation_epochs[[event]][[roi]]$numbins <- numbins
-  obj$fixation_epochs[[event]][[roi]]$varnames <- vars
-
-
-  # df$roi <- roi
-  # df$epoch_start <- start
-  # df$epoch_end <- end
-  # df$binwidth <- binwidth
-  # df <- df[,c('ID','eyetrial','fixation_key','roi','epoch_start','epoch_end','binwidth',startvar,endvar,'bin_start','bin_end',event,hitvar,vars)]
-  #
-  # if(length(obj$beh)==0){
-  #   warning('No behavioral data found. Did you run add_behdata? Creating dummy dataset...')
-  #   obj <- add_behdata(obj)
-  #
-  # }
-  #
-  # df <- merge(obj$beh[c('ID','eyetrial',obj$indexvars)],df,by=c('ID','eyetrial'),all.y=T)
-  # df <- dplyr::arrange(df,fixation_key)
-  #
-  # if(is.null(obj$epochs$fixations))
-  #   obj$epochs$fixations <- list()
-  #
-  # if(is.null(obj$epochs$fixations[[event]]))
-  #   obj$epochs$fixations[[event]] <- list()
-  #
-  # obj$epochs$fixations[[event]][[roi]] <- df
-
-  # force garbage collection:
-  gc()
 
   #record what we did
   funcall <- list()
@@ -359,7 +338,7 @@ intervals2matrix <- function(start,end,val,numbins){
 
     subs <- as.matrix(cbind(rep(1,length(x)),x))
     vals <- rep(y,nrow(subs))
-    return(accumarray(subs,vals,sz = c(1,n),fillval = NA))
+    return(pracma::accumarray(subs,vals,sz = c(1,n),fillval = NA))
 
   }
 
@@ -376,77 +355,6 @@ intervals2matrix <- function(start,end,val,numbins){
 }
 
 
-
-# do_agg_fixations <- function(obj,event='starttime',roi,groupvars=c(),level='group',shape='long',condition="NULL"){
-#
-#   prefix <- 't'
-#
-#   # df <- obj$epochs$fixations[[event]][[roi]]
-#
-#   df <- eyemerge(obj,'epoched_fixations',behdata=groupvars,event=event,roi=roi,condition=condition,condition.str=T)
-#
-#   # remove unneccesary columns to save memory
-#   # df <- dplyr::select(df, c(-fixation_key, -sttime, -entime, -bin_start, -bin_end)) #, -epoch_start, -epoch_end, -binwidth))
-#
-#   #remove specified filters: filter[1] == column name, filter[2] == condition (e.g., preposition == 'above')
-#   # if(!is.null(filter)){
-#     # var = filter[1]
-#     # val = filter[2]
-#     # filter_criteria <- lazyeval::interp(~ which_column == val, which_column = as.name(var))
-#     # df <- dplyr::filter_(df,filter_criteria)
-#
-#     # df <-df[eval(parse(text=paste0("df$",filter[1]))) == filter[2], ]
-#   # if(condition!="NULL"){
-#   #   condition_call <- parse(text=condition)
-#   #   r <- eval(condition_call,df, parent.frame())
-#   #   df <- df[r, ]
-#   # }
-#   # # }
-#
-#
-#
-#   epoch_start <- df$epoch_start[1]
-#   epoch_end <- df$epoch_end[1]
-#   binwidth <- df$binwidth[1]
-#
-#   binnames <- names(df)[grepl(paste0('^',prefix,'[_0-9]'),names(df))]
-#   #reshape the data (turn our bins into rows)
-#   # na.rm saves memory
-#   df <- tidyr::gather_(df,'bin','val',binnames, na.rm = TRUE)
-#
-#  #aggregate by trial(max)
-#   #this is super weird, just to make things play nice with dplyr
-#   varnames = sapply(c(obj$idvar,obj$indexvars,groupvars,'bin'), . %>% {as.formula(paste0('~', .))})
-#   df <- dplyr::group_by_(df,.dots=varnames) %>%
-#     dplyr::summarise(val = max(val,na.rm=T))
-#
-#  if(level!='trial'){
-#     #aggregate by subject (mean)
-#     varnames2 = sapply(c(obj$idvar,groupvars,'bin'), . %>% {as.formula(paste0('~', .))})
-#     df <- dplyr::group_by_(dplyr::ungroup(df),.dots=varnames2) %>%
-#       dplyr::summarise(val=mean(val,na.rm=T))
-#   }
-#   if(level=='group'){
-#     #aggregate across subjects
-#     varnames3 = sapply(c(groupvars,'bin'), . %>% {as.formula(paste0('~', .))})
-#     df <-  dplyr::group_by_(dplyr::ungroup(df),.dots = varnames3) %>%
-#       dplyr::summarise(val=mean(val,na.rm=T))
-#   }
-#
-#   df$roi <- roi
-#   df$epoch_start <- epoch_start
-#   df$epoch_end <- epoch_end
-#   df$binwidth <- binwidth
-#
-#   if(shape=='wide'){
-#     df <- df %>%
-#       tidyr::spread(bin,val)
-#   }
-#
-#   return(dplyr::ungroup(df))
-# }
-#
-
 aggregate_fixation_epochs <- function(obj,event='starttime',rois=c(1),groupvars=c('ID'),level='group',type='probability',condition=NULL,condition.str=FALSE){
 
 
@@ -461,67 +369,67 @@ aggregate_fixation_epochs <- function(obj,event='starttime',rois=c(1),groupvars=
 
   for(r in rois){
 
-  df <- eyemerge(obj,'epoched_fixations',event=event,roi=r, behdata = groupvars,condition=condition, condition.str=T)
+    df <- eyemerge(obj,'epoched_fixations',event=event,roi=r, behdata = groupvars,condition=condition, condition.str=T)
 
 
-  timevars <- obj$fixation_epochs[[event]][[r]]$varnames
+    timevars <- obj$fixation_epochs[[event]][[r]]$varnames
 
-  if(is.numeric(r))
-    hitvar <- paste0('roi_',r)
-  else
-    hitvar <- paste0(r,'_hit')
+    if(is.numeric(r))
+      hitvar <- paste0('roi_',r)
+    else
+      hitvar <- paste0(r,'_hit')
 
-  test <- dplyr::select_(df,.dots=paste0('-',hitvar)) %>%
-    tidyr::gather_('timepoint','val',timevars) %>%
-    dplyr::mutate(timepoint = gsub('t','',timepoint),
-           timepoint = as.numeric(gsub('_','-',timepoint)))
+    test <- dplyr::select_(df,.dots=paste0('-',hitvar)) %>%
+      tidyr::gather_('timepoint','val',timevars) %>%
+      dplyr::mutate(timepoint = gsub('t','',timepoint),
+                    timepoint = as.numeric(gsub('_','-',timepoint)))
 
-  if(is.numeric(r)){
-    test$roi <- hitvar
-    roinames <- c(roinames,hitvar)
+    if(is.numeric(r)){
+      test$roi <- hitvar
+      roinames <- c(roinames,hitvar)
+    }
+    else{
+      test$roi <- r
+      roinames <- c(roinames,r)
+    }
+
+    allres <-c(allres,list(test))
   }
-  else{
-    test$roi <- r
-    roinames <- c(roinames,r)
-  }
-
-  allres <-c(allres,list(test))
-}
 
 
   #aggregate on the trial level
   allres <- dplyr::bind_rows(allres)%>%
     dplyr::group_by_(.dots=unique(c('ID','eyetrial',groupvars,'timepoint','roi')))%>%
-    dplyr::summarise(val = max(val))
+    dplyr::summarise(val = max(val,na.rm=T))
 
   if(level %in% c('subject','ID','group')){
 
     allres <- dplyr::group_by_(allres,.dots=unique(c('ID',groupvars,'timepoint','roi'))) %>%
-    dplyr::summarise(val = mean(val,na.rm=T))
+      dplyr::summarise(val = mean(val,na.rm=T))
 
-    if(type %in% c('difference','logRatio','proportion')){
+    if(tolower(type) %in% c('difference','logratio','proportion')){
 
       if(length(rois)>2 && type=='difference')
         stop('can only do difference waves with 2 rois at a time')
 
       allres <- tidyr::spread(allres,roi,val)
 
-      if(type=='logRatio'){
+      if(tolower(type)=='logratio'){
 
-      allres <- dplyr::mutate_(allres,val = sprintf('log(%s+1) / (%s+1)',roinames[1],roinames[2]),
-                       roi = "'logRatio'")
+        allres <- dplyr::mutate_(allres,val = sprintf('log(%s+1) / (%s+1)',roinames[1],roinames[2]),
+                                 roi = "'logRatio'")
       }
-      else if(type=='proportion'){
+      else if(tolower(type)=='proportion'){
         allres <- dplyr::mutate_(allres,val = sprintf('%s / %s',roinames[1],roinames[2]),
                                  roi = "'proportion'")
       }
-      else if(type=='difference'){
+      else if(tolower(type)=='difference'){
         allres <- dplyr::mutate_(allres,val = sprintf('%s - %s',roinames[1],roinames[2]),
                                  roi = "'difference'")
       }
 
       allres <- dplyr::select_(allres,paste0('-',roinames[1]),
-                       paste0('-',roinames[2]))
+                               paste0('-',roinames[2]))
     }
 
 
@@ -544,80 +452,6 @@ aggregate_fixation_epochs <- function(obj,event='starttime',rois=c(1),groupvars=
 
 
 
-# aggregate_fixation_timeseries <- function(obj,event='starttime',rois,groupvars=c(),level='group',shape='long',type='probability',condition=NULL,condition.str=FALSE){
-#
-#   agg <- data.frame()
-#
-#   if(!condition.str)
-#     condition <- deparse(substitute(condition))
-#
-#   if((type != 'probability') && length(rois==2)){
-#
-#     if(any(groupvars == 'roi')){
-#       stop('Using "roi" as a grouping variable does not work if you want to plot a contrast score.')
-#     }
-#
-#     aggID_one <- aggregate_fixation_timeseries(obj,event=event,roi=rois[1],groupvars = groupvars,shape='long',level='ID',condition=condition,condition.str=T)
-#     aggID_two <- aggregate_fixation_timeseries(obj,event=event,roi=rois[2],groupvars = groupvars,shape='long',level='ID',condition=condition, condition.str=T)
-#
-#     # force garbage collection:
-#     gc()
-#
-#     agg <- dplyr::inner_join(aggID_one,aggID_two,by=c('ID',groupvars,'bin'))
-#
-#     if( ( (!all(agg$binwidth.x==agg$binwidth.y)) || (!all(agg$epoch_start.x==agg$epoch_start.y)) || (!all(agg$epoch_end.x==agg$epoch_end.y)) ))
-#       stop('Epochs/binning is different for the different ROIs. Data will not match up')
-#
-#     agg <- dplyr::select(agg, -epoch_start.y, -epoch_end.y, -binwidth.y)
-#
-#     agg <- dplyr::rename(agg,
-#                            epoch_start = epoch_start.x,
-#                            epoch_end = epoch_end.x,
-#                            binwidth = binwidth.x)
-#
-#     if(type == 'difference'){
-#       agg$val <- agg$val.x - agg$val.y
-#     } else if (type == 'logRatio'){
-#       agg$val <- log((agg$val.x+1.0) / (agg$val.y+1.0))
-#     } else if(type == 'proportion'){
-#       agg$val <- agg$val.x / agg$val.y
-#     }
-#
-#     #select only the variables we want
-#     agg <- dplyr::select_(agg, .dots= c('ID',groupvars,'bin','val','epoch_start','epoch_end','binwidth'))
-#
-#     if(level=='group'){
-#       #group_by using string variable names
-#       dots <- lapply(c('bin','epoch_start','epoch_end','binwidth',groupvars), as.symbol)
-#       agg <- dplyr::group_by_(agg,.dots=dots) %>%
-#         dplyr::summarise(val = mean(val,na.rm=T))
-#     }
-#
-#     agg$roi <- type
-#
-#   }
-#   else{
-#     for(r in rois){
-#       aggtmp <- do_agg_fixations(obj,event=event,
-#                                               roi=r,
-#                                               groupvars = groupvars,
-#                                               shape=shape,
-#                                               level=level,
-#                                               condition=condition)
-#
-#
-#       if(nrow(agg)==0)
-#         agg <- aggtmp
-#       else
-#         agg <- rbind(agg,aggtmp)
-#     }
-#   }
-#
-#   # force garbage collection:
-#   gc()
-#
-#   return(agg)
-# }
 
 downsample <- function (v, N){ # v is the input vector, and keep every N sample
   seed <- c(TRUE,rep(FALSE,N-1))
@@ -695,9 +529,9 @@ itrackR.data <- function(data){
 
   #return the proper data,depending on what we ask for
   output <- switch(data,
-         path = d,
-         edfs = edfs,
-         beh = readRDS(file.path(d,'beh.rds')))
+                   path = d,
+                   edfs = edfs,
+                   beh = readRDS(file.path(d,'beh.rds')))
 
   return(output)
 }
@@ -707,6 +541,8 @@ itrackr.data <- function(data){
   output <- itrackR.data(data)
   return(output)
 }
+
+
 
 remove.subjects <- function(obj,ID){
 
@@ -718,54 +554,56 @@ remove.subjects <- function(obj,ID){
   if(length(ID)==0)
     stop("ID(s) not found")
 
-subs_to_keep <- !(obj$subs %in% ID)
+  subs_to_keep <- !(obj$subs %in% ID)
 
-#remove from our list of edfs and subject ids
- obj$edfs <- obj$edfs[subs_to_keep]
- obj$subs <- obj$subs[subs_to_keep]
+  #remove from our list of edfs and subject ids
+  obj$edfs <- obj$edfs[subs_to_keep]
+  obj$subs <- obj$subs[subs_to_keep]
 
- #remove actual data
- obj$header <- obj$header[!(obj$header[[obj$idvar]] %in% ID),]
- obj$fixations <- obj$fixations[!(obj$fixations[[obj$idvar]] %in% ID),]
- obj$saccades <- obj$saccades[!(obj$saccades[[obj$idvar]] %in% ID),]
- obj$blinks <- obj$blinks[!(obj$blinks[[obj$idvar]] %in% ID),]
- obj$messages <- obj$messages[!(obj$messages[[obj$idvar]] %in% ID),]
+  #remove actual data
+  obj$header <- obj$header[!(obj$header[[obj$idvar]] %in% ID),]
+  obj$fixations <- obj$fixations[!(obj$fixations[[obj$idvar]] %in% ID),]
+  obj$saccades <- obj$saccades[!(obj$saccades[[obj$idvar]] %in% ID),]
+  obj$blinks <- obj$blinks[!(obj$blinks[[obj$idvar]] %in% ID),]
+  obj$messages <- obj$messages[!(obj$messages[[obj$idvar]] %in% ID),]
 
- #if samples have been loaded
- if(length(z$samples)>0){
+  #if samples have been loaded
+  if(length(z$samples)>0){
 
-   #find the .rds files
-   sampfiles <- obj$samples[obj$subs %in% ID]
-   obj$samples <- obj$samples[subs_to_keep] #remove from our list
+    #find the .rds files
+    sampfiles <- obj$samples[obj$subs %in% ID]
+    obj$samples <- obj$samples[subs_to_keep] #remove from our list
 
-   #delete the actual files
-   for(s in sampfiles){
-     if(file.exists(s))
-       file.remove(s)
-   }
- }
+    #delete the actual files
+    for(s in sampfiles){
+      if(file.exists(s))
+        file.remove(s)
+    }
+  }
 
- #if drift correction has been performed, remove from the "transform" table
- if(length(obj$transform)>0)
-   obj$transform <- obj$transform[!(obj$transform[obj$idvar] %in% ID)]
+  #if drift correction has been performed, remove from the "transform" table
+  if(length(obj$transform)>0)
+    obj$transform <- obj$transform[!(obj$transform[obj$idvar] %in% ID)]
 
- #remove from epoched data-- very tedious (rois within events within fixations/samples)
+  #remove from epoched data-- very tedious (rois within events within fixations/samples)
 
- epoch_types <- names(obj$epochs) #types: fixations/samples
+  epoch_types <- names(obj$epochs) #types: fixations/samples
 
- for(t in epoch_types){
-   events <- names(obj$epochs[[t]]) #time-locking events
-   for(e in events){
-     rois <- names(obj$epochs[[t]][[e]]) #individual rois
-     for(r in rois){
-       keeprows <- !(obj$epochs[[t]][[e]][[r]][[obj$idvar]] %in% ID) #keep only the rows without the IDs to throw away
-       obj$epochs[[t]][[e]][[r]] <- obj$epochs[[t]][[e]][[r]][keeprows,]
-     }
-   }
- }
+  for(t in epoch_types){
+    events <- names(obj$epochs[[t]]) #time-locking events
+    for(e in events){
+      rois <- names(obj$epochs[[t]][[e]]) #individual rois
+      for(r in rois){
+        keeprows <- !(obj$epochs[[t]][[e]][[r]][[obj$idvar]] %in% ID) #keep only the rows without the IDs to throw away
+        obj$epochs[[t]][[e]][[r]] <- obj$epochs[[t]][[e]][[r]][keeprows,]
+      }
+    }
+  }
 
- return(obj)
+  return(obj)
 }
+
+
 
 add.subjects <- function(obj,edfs,beh){
 
@@ -816,6 +654,7 @@ add.subjects <- function(obj,edfs,beh){
 }
 
 
+
 reset <- function(obj, reload = FALSE, rebuild = FALSE,keep.rois = FALSE, beh=NULL){
 
 
@@ -827,29 +666,29 @@ reset <- function(obj, reload = FALSE, rebuild = FALSE,keep.rois = FALSE, beh=NU
   }
   else{
 
-  #undo drift correction if it was done
-  obj <- undrift(obj)
+    #undo drift correction if it was done
+    obj <- undrift(obj)
 
-  newobj <- itrackr() #blank itrackr object
+    newobj <- itrackr() #blank itrackr object
 
 
-  newobj$fixations <- dplyr::select(obj$fixations, -dplyr::matches('roi_*'),-dplyr::matches('*_hit'))
-  newobj$fixations <- newobj$fixations[!(names(newobj$fixations) %in% obj$roimapvars)]
-  newobj$saccades <- dplyr::select(obj$saccades, -dplyr::matches('roi_*'),-dplyr::matches('*_hit'))
-  newobj$saccades <- newobj$saccades[!(names(newobj$saccades) %in% obj$roimapvars)]
-  newobj$header <- obj$header[!(names(obj$header) %in% c(obj$roimapvars,obj$indexvars, obj$timevars))]
-  newobj$edfs <- obj$edfs
-  newobj$ids <- obj$ids
-  newobj$binocular <- obj$binocular
-  newobj$resolution <- obj$resolution
-  newobj$sample.dir <- obj$sample.dir
-  newobj$idvar <- obj$idvar
-  newobj$blinks <- obj$blinks
-  newobj$messages <- obj$messages
-  newobj$samples <- obj$samples
+    newobj$fixations <- dplyr::select(obj$fixations, -dplyr::matches('roi_*'),-dplyr::matches('*_hit'))
+    newobj$fixations <- newobj$fixations[!(names(newobj$fixations) %in% obj$roimapvars)]
+    newobj$saccades <- dplyr::select(obj$saccades, -dplyr::matches('roi_*'),-dplyr::matches('*_hit'))
+    newobj$saccades <- newobj$saccades[!(names(newobj$saccades) %in% obj$roimapvars)]
+    newobj$header <- obj$header[!(names(obj$header) %in% c(obj$roimapvars,obj$indexvars, obj$timevars))]
+    newobj$edfs <- obj$edfs
+    newobj$ids <- obj$ids
+    newobj$binocular <- obj$binocular
+    newobj$resolution <- obj$resolution
+    newobj$sample.dir <- obj$sample.dir
+    newobj$idvar <- obj$idvar
+    newobj$blinks <- obj$blinks
+    newobj$messages <- obj$messages
+    newobj$samples <- obj$samples
 
-  if(keep.rois)
-    newobj$rois <- obj$rois
+    if(keep.rois)
+      newobj$rois <- obj$rois
 
   }
 
