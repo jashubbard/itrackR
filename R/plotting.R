@@ -127,7 +127,7 @@ plot_samples <- function(obj,ID,events=T,timestamp=NULL,showmean=T,bin=T,nbins=1
   # samps <- as.data.frame(samps)
 
 
-  samps <- get_samples(z,104,fields=c('time','pa','blink','fixation'))
+  samps <- get_samples(z,ID,fields=c('time','pa','blink','fixation'))
 
 
   samps$index <- 1:nrow(samps)
