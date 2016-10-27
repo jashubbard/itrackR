@@ -4,10 +4,12 @@ useDynLib(itrackR)
 
 export("%>%")
 export("%dopar%")
+export("%do%")
 export(":=")
 
 importFrom(magrittr,"%>%")
 importFrom(foreach, "%dopar%")
+importFrom(foreach, "%do%")
 importFrom(data.table, ":=")
 
 import(data.table)
