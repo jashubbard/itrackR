@@ -59,6 +59,10 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
 
   allsamps <- list()
 
+  #if we're not forcing and all the files are there, then just go back
+  if(!force && all(unlist(lapply(obj$samples,file.exists))))
+    return(obj)
+
   #check for directory to save .rds files into
   if(!is.null(outdir))
     obj$sample.dir <- outdir #if given as argument
@@ -70,6 +74,8 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
     obj$sample.dir <- tmpdir
 
   }
+
+
 
   #default, run in parallel using foreach
   if(parallel){
@@ -145,14 +151,14 @@ load_sample_file <- function(obj,i,force=F){
   #create a separate database file for each subject in sample.dir
   #one big db would be nice, but can't do in parallel
   db <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=dbname)
-  RSQLite::dbSendQuery(db,'PRAGMA page_size=4096') #increase the page size for increased performance (but a bit more memory)
+  RSQLite::dbGetQuery(db,'PRAGMA page_size=4096') #increase the page size for increased performance (but a bit more memory)
 
   #write all the data into a table called samples
   RSQLite::dbWriteTable(db,'samples',samps,overwrite=T,append=F,row.names=F)
 
   #create an index for time and for trial. Makes searching and joining faster
-  RSQLite:: dbSendQuery(db,"CREATE INDEX subtime ON samples (ID,time)")
-  RSQLite::dbSendQuery(db,'CREATE INDEX person ON samples (ID,eyetrial)')
+  RSQLite:: dbGetQuery(db,"CREATE INDEX subtime ON samples (ID,time)")
+  RSQLite::dbGetQuery(db,'CREATE INDEX person ON samples (ID,eyetrial)')
   RSQLite::dbDisconnect(db)
 
 
@@ -428,8 +434,8 @@ if(parallel){
   cl <- parallel::makeCluster(ncores)
   doParallel::registerDoParallel(cl)
 
-  #run with dopar
-  epochs <- foreach::foreach(i=iterators::iter(1:length(obj$edfs)),.packages=c('data.table')) %dopar%
+  #run with %dopar%
+  epochs <- foreach::foreach(i=iterators::iter(1:length(obj$edfs)),.packages=c('data.table','itrackR'),.errorhandling = 'remove',.combine=dplyr::bind_rows) %dopar%
   {
     eps <- get_avg_epochs(obj,i,...)
     eps
@@ -439,14 +445,15 @@ if(parallel){
 }
 else{
 
-  #serial method - use lapply
-  epochs <- lapply(1:length(obj$edfs), function(x) get_avg_epochs(obj,x,...))
-
+  #serial version - exactly the same, but with %do%
+  epochs <- foreach::foreach(i=iterators::iter(1:length(obj$edfs)),.packages=c('data.table','itrackR'),.errorhandling = 'remove',.combine=dplyr::bind_rows) %do%
+  {
+    eps <- get_avg_epochs(obj,i,...)
+    eps
+  }
 }
 
 print('DONE!')
-
-epochs <- dplyr::bind_rows(epochs)
 
 
 return(epochs)
@@ -482,13 +489,13 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
     if(i==1){
       #first row, create a temporary table called EPOCHS
       if(RSQLite::dbExistsTable(db,'EPOCHS'))
-        RSQLite::dbSendQuery(db,'DROP TABLE EPOCHS')
+        RSQLite::dbGetQuery(db,'DROP TABLE EPOCHS')
 
-      RSQLite::dbSendQuery(db,sprintf('CREATE TEMPORARY TABLE EPOCHS AS SELECT ID,time,eyetrial,pa, time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i,tmp$tstart[i],tmp$tend[i],subID))
+      RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE EPOCHS AS SELECT ID,time,eyetrial,pa, time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i,tmp$tstart[i],tmp$tend[i],subID))
       RSQLite::dbBegin(db) #faster INSERT if we use BEGIN...COMMIT statement
 
     }else #otherwise, append to the already made EPOCHS table
-      RSQLite::dbSendQuery(db,sprintf('INSERT INTO EPOCHS (ID,time,eyetrial,pa,timepoint,epochnum) SELECT ID,time,eyetrial,pa,time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i, tmp$tstart[i],tmp$tend[i],subID))
+      RSQLite::dbGetQuery(db,sprintf('INSERT INTO EPOCHS (ID,time,eyetrial,pa,timepoint,epochnum) SELECT ID,time,eyetrial,pa,time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i, tmp$tstart[i],tmp$tend[i],subID))
   }
 
   #COMMIT when done inserting
@@ -506,15 +513,15 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
 
     #create a new table, BASELINE that holds the baselined pupil data
     if(RSQLite::dbExistsTable(db,'BASELINE'))
-      dbSendQuery(db,'DROP TABLE BASELINE')
+      dbGetQuery(db,'DROP TABLE BASELINE')
 
-    RSQLite::dbSendQuery(db,sprintf('CREATE TEMPORARY TABLE BASELINE AS SELECT *, (pa-baseline)/baseline as pupil_baseline FROM EPOCHS LEFT JOIN (SELECT ID,eyetrial,AVG(pa) as baseline FROM EPOCHS WHERE timepoint BETWEEN %d and %d GROUP BY epochnum) base ON base.ID=EPOCHS.ID AND base.eyetrial=EPOCHS.eyetrial',bl[1],bl[2]))
+    RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE BASELINE AS SELECT *, (pa-baseline)/baseline as pupil_baseline FROM EPOCHS LEFT JOIN (SELECT ID,eyetrial,AVG(pa) as baseline FROM EPOCHS WHERE timepoint BETWEEN %d and %d GROUP BY epochnum) base ON base.ID=EPOCHS.ID AND base.eyetrial=EPOCHS.eyetrial',bl[1],bl[2]))
   }
 
   #for aggregating
   if(aggregate){
     #this holds everyone's behavioral data
-    RSQLite::dbSendQuery(db,sprintf('ATTACH "%s" as beh', file.path(path.expand(obj$sample.dir),'beh.sqlite')))
+    RSQLite::dbGetQuery(db,sprintf('ATTACH "%s" as beh', file.path(path.expand(obj$sample.dir),'beh.sqlite')))
 
     if(!is.null(baseline)){
       #if baselined, merge BASELINE with the behavioral data and compute the average by factors and timepoint
@@ -527,7 +534,7 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
     }
 
     #don't need this anymore
-    RSQLite::dbSendQuery(db,'DETACH beh')
+    RSQLite::dbGetQuery(db,'DETACH beh')
   }
   else{
     #if not aggregating, give me all the data
@@ -539,7 +546,7 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
 
   #remove the EPOCHS table
   if(cleanup){
-    RSQLite::dbSendQuery(db,'DROP TABLE EPOCHS')
+    RSQLite::dbGetQuery(db,'DROP TABLE EPOCHS')
   }
 
   #disconnect from database
@@ -547,7 +554,17 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
 
   #add the actuall time
   ep <- epoch[1]:epoch[2]
-  res$epoch_time <- ep[res$timepoint]
+  res$epoch_time <- as.numeric(ep[res$timepoint])
+
+  res$pupil <- as.numeric(res$pupil)
+
+  if(!is.null(baseline)){
+    res$pupil_raw <- as.numeric(res$pupil_raw)
+
+    if(!aggregate)
+      res$baseline <- as.numeric(res$baseline)
+
+  }
 
   return(res)
 
@@ -568,7 +585,7 @@ remove_blinks <- function(obj,interpolate=F,parallel=T,ncores=2){
 
 
     #run with dopar
-    done <- foreach::foreach(dbname=iterators::iter(obj$samples)) %dopar%
+    done <- foreach::foreach(dbname=iterators::iter(obj$samples),.packages = c('itrackR'), .errorhandling = 'remove') %dopar%
   {
     done <- blink_remove(dbname,interpolate=interpolate)
     done
@@ -595,7 +612,7 @@ blink_remove <- function(dbname,interpolate=FALSE){
   db <- DBI::dbConnect(RSQLite::SQLite(),dbname)
 
   #clear out blink or artifact periods in original data
-  DBI::dbSendQuery(db,'UPDATE samples SET pa=NULL WHERE blink=1')
+  DBI::dbGetQuery(db,'UPDATE samples SET pa=NULL WHERE blink=1')
 
   if(interpolate){
     #pull out pupil data
@@ -612,10 +629,10 @@ blink_remove <- function(dbname,interpolate=FALSE){
     #add it to the database
     DBI::dbWriteTable(db,'pupil_interp',towrite,row.names=F,overwrite=T)
     #create index for speed
-    DBI::dbSendQuery(db,'CREATE INDEX stime ON pupil_interp (ID,time)')
+    DBI::dbGetQuery(db,'CREATE INDEX stime ON pupil_interp (ID,time)')
 
     #add our interpolated data to the blink periods
-    DBI::dbSendQuery(db,'UPDATE samples SET pa = (SELECT interp FROM pupil_interp WHERE samples.ID=pupil_interp.ID AND samples.time=pupil_interp.time) WHERE blink=1')
+    DBI::dbGetQuery(db,'UPDATE samples SET pa = (SELECT interp FROM pupil_interp WHERE samples.ID=pupil_interp.ID AND samples.time=pupil_interp.time) WHERE blink=1')
 
     #thorw away the table
     DBI::dbRemoveTable(db,'pupil_interp')
