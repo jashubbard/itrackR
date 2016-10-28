@@ -40,7 +40,7 @@ itrackr <- function(edfs = NULL,path=NULL,pattern='*.edf',resolution=c(1024,768)
               blinks = data.frame(),
               messages = data.frame(),
               rois = list(),
-              fixation_epochs = list(),
+              fixations_epochs = list(),
               beh = data.frame(),
               transform = list(),
               history = list(step=0)
@@ -79,10 +79,10 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
   alldata <- edfR::combine.eyedata(allbatch,fields=fields)
 
  #create key variables for each, for easy sorting
-  alldata$fixations$fixation_key <- 1:nrow(alldata$fixations)
-  alldata$saccades$saccade_key <- 1:nrow(alldata$saccades)
-  alldata$blinks$blink_key <- 1:nrow(alldata$blinks)
-  alldata$messages$message_key <- 1:nrow(alldata$messages)
+  alldata$fixations$key <- 1:nrow(alldata$fixations)
+  alldata$saccades$key <- 1:nrow(alldata$saccades)
+  alldata$blinks$key <- 1:nrow(alldata$blinks)
+  alldata$messages$key <- 1:nrow(alldata$messages)
 
 
   #get the baseline for each subject, repeated for all rows of their data in the header
@@ -155,7 +155,7 @@ fixdata <- dplyr::mutate(fixdata,
                          entime = TRIAL_START_TIME + CURRENT_FIX_END,
                          gavx = CURRENT_FIX_X,
                          gavy = CURRENT_FIX_Y,
-                         fixation_key = 1:nrow(fixdata))
+                         key = 1:nrow(fixdata))
 }
 else if(type=='saccades'){
 
@@ -164,7 +164,7 @@ else if(type=='saccades'){
 
 fixdata$ID <- as.numeric(gsub("([0-9]*).*","\\1",fixdata$ID))
 
-obj$fixations <- dplyr::select(fixdata,ID,eyetrial,sttime,entime,gavx,gavy,fixation_key)
+obj$fixations <- dplyr::select(fixdata,ID,eyetrial,sttime,entime,gavx,gavy,key)
 
 return(obj)
 
@@ -564,13 +564,23 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event='sta
   }
 
   #if we're getting epoched fixation data, we already have what we need, just need to grab the right variables, etc.
-  if(eyedata=='epoched_fixations'){
+  if(grepl('epoch',eyedata)){
 
-    if(is.null(event) || is.null(roi))
-      stop('You must provide the name of the time-locking event and the ROI')
+    if(is.null(event))
+      stop('You must provide the name of the time-locking event')
+
+    if(eyedata !='blinks_epochs' && is.null(roi))
+      stop('You must provide the name of the ROI')
+
+
+    if(eyedata=='epoched_fixations')
+      eyedata= 'fixations_epochs'
+
+    if(eyedata=='blinks_epochs')
+      roi <- 1
 
     # eyes <- obj$epochs$fixations[[event]][[roi]]
-    eyes <- obj$fixation_epochs[[event]][[roi]]$data
+    eyes <- obj[[eyedata]][[event]][[roi]]$data
 
     beh <- obj$beh
 
@@ -589,11 +599,24 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event='sta
     else
       hitvar <- paste0(roi,'_hit')
 
-    numbins <- obj$fixation_epochs[[event]][[roi]]$numbins
+    if(eyedata=='blinks_epochs'){
+
+      hitvar = 'blink'
+      eyes$blink <- 1
+
+    }
+
+    numbins <- obj[[eyedata]][[event]][[roi]]$numbins
 
     #create our timeseries based on start and end times
-    fixmatrix <- intervals2matrix(eyes$start_adj,eyes$end_adj,eyes[,hitvar],numbins)
-    colnames(fixmatrix) <- obj$fixation_epochs[[event]][[roi]]$varnames
+
+    if(eyedata=='blinks_epochs')
+      fillval=0
+    else
+      fillval=NA
+
+    fixmatrix <- intervals2matrix(eyes$start_adj,eyes$end_adj,eyes[,hitvar],numbins,fillval)
+    colnames(fixmatrix) <- obj[[eyedata]][[event]][[roi]]$varnames
     eyes <- cbind(eyes,fixmatrix)
 
 
@@ -737,7 +760,7 @@ drift_correct <- function(obj,vars=c('ID'),threshold = 10){
   fixnames <- names(obj$fixations)
 
   fixdata <- eyemerge(obj,behdata=unique(c('ID','eyetrial',vars)),trialtime=FALSE) %>%
-    dplyr::arrange(fixation_key)
+    dplyr::arrange(key)
 
   fixdata <- dplyr::group_by_(fixdata,.dots=unique(c('ID',vars))) %>%
     dplyr::mutate(center_x = median(gavx,na.rm=T),
@@ -761,19 +784,19 @@ drift_correct <- function(obj,vars=c('ID'),threshold = 10){
   fixdata <- dplyr::mutate(fixdata,
                           gavx = gavx - shift_x,
                           gavy = gavy - shift_y) %>%
-    dplyr::arrange(fixation_key)
+    dplyr::arrange(key)
 
 
   #add the new gavx and gavy values
   #merge so it's robust to weird quirks when calling eyemerge (duplicate rows, etc)
-  obj$fixations <- dplyr::left_join(dplyr::select(obj$fixations,-gavx,-gavy),dplyr::select(fixdata,fixation_key,gavx,gavy),by='fixation_key') %>%
-    dplyr::arrange(fixation_key)
+  obj$fixations <- dplyr::left_join(dplyr::select(obj$fixations,-gavx,-gavy),dplyr::select(fixdata,key,gavx,gavy),by='key') %>%
+    dplyr::arrange(key)
 
 
   # obj$fixations$gavx <- fixdata$gavx
   # obj$fixations$gavy <- fixdata$gavy
 
-  obj$transform$fixations <- fixdata[c('ID','eyetrial','fixation_key','shift_x','shift_y')]
+  obj$transform$fixations <- fixdata[c('ID','eyetrial','key','shift_x','shift_y')]
 
   #record what we did
 
@@ -840,12 +863,12 @@ undrift <- function(obj){
   if(length(obj$transform)==0)
     return(obj)
 
-  fixdata <- dplyr::left_join(obj$fixations, obj$transform$fixations,by=c(obj$idvar,'eyetrial','fixation_key'))
+  fixdata <- dplyr::left_join(obj$fixations, obj$transform$fixations,by=c(obj$idvar,'eyetrial','key'))
 
   fixdata <- dplyr::mutate(fixdata,
                            gavx = gavx + shift_x,
                            gavy = gavy + shift_y) %>%
-    dplyr::arrange(fixation_key)
+    dplyr::arrange(key)
 
   obj$fixations <- fixdata[names(obj$fixations)]
 

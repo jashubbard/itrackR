@@ -53,7 +53,7 @@ calcHits_fixations <- function(obj,rois='all',append=FALSE){
 
   allnames <- paste0('roi_',allnames)
 
-  hits <- data.frame(fixation_key = obj$fixations$fixation_key)
+  hits <- data.frame(key = obj$fixations$key)
 
   names(hits)[-1] <- allnames
 
@@ -61,14 +61,14 @@ calcHits_fixations <- function(obj,rois='all',append=FALSE){
     hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$fixations$gavx,obj$fixations$gavy,allrois[[i]]))
   }
 
-  hits <- hits[,c('fixation_key',allnames)]
+  hits <- hits[,c('key',allnames)]
 
   if(!append)
-    tmp <- obj$fixations[c('fixation_key','ID','eyetrial','sttime','entime','gavx','gavy')]
+    tmp <- obj$fixations[c('key','ID','eyetrial','sttime','entime','gavx','gavy')]
   else
     tmp <- obj$fixations
 
-  obj$fixations <- cbind(tmp,dplyr::select(hits,-fixation_key))
+  obj$fixations <- cbind(tmp,dplyr::select(hits,-key))
 
   return(obj)
 }
@@ -113,12 +113,12 @@ mapROIs <- function(obj,names,indicators=NULL,cleanup=FALSE){
   for(eyedata in c('fixations','saccades')){
 
     if(eyedata=='fixations'){
-      keyvar='fixation_key'
+      keyvar='key'
       roivars <- paste0('roi_',roinames)
       newnames <- paste0(startnames,'_hit')
     }
     else if(eyedata=='saccades'){
-      keyvar='saccade_key'
+      keyvar='key'
       roivars = c(paste0('roi_start_',roinames))
       roivars = c(roivars, paste0('roi_end_',roinames))
       newnames <- c(paste0(startnames,'_start_hit'),paste0(startnames,'_end_hit'))
@@ -222,18 +222,40 @@ ind2sub <- function(mat,ind){
   return(list(row=r,col=c))
 }
 
-epoch_fixations <- function(obj,rois=c(1),start=0,end=700,binwidth=25,event='starttime',type='standard'){
+epoch_fixations <- function(obj,rois=c(1),start=0,end=700,binwidth=25,event='starttime',type='standard',...){
+
+  obj <- epoch_events(obj,eyedata='fixations',rois=rois,epoch = c(start,end),binwidth=binwidth,event=event,type=type,...)
+  return(obj)
+}
+
+epoch_events <- function(obj,eyedata='fixations',epoch = c(0,700), event='starttime',rois=c(1),binwidth=25,type='standard',saccade_hit = 'end'){
+
+  keyvar <- 'key'
+  epochvar <- paste0(eyedata,'_epochs')
+
+  if(eyedata=='fixations')
+    saccade_hit <- NULL
+
+  if(eyedata=='blinks')
+    rois <- 1
+
+  start <- epoch[1]
+  end <- epoch[2]
+  startvar <- 'sttime'
+  endvar <- 'entime'
 
   for(roi in rois){
-    startvar <- 'sttime'
-    endvar <- 'entime'
 
     if(is.numeric(roi))
-      hitvar <- paste0('roi_',roi)
+      hitvar <- paste(c('roi',saccade_hit,roi),collapse = '_')
     else
-      hitvar <- paste0(roi,'_hit')
+      hitvar <- paste(c(roi,saccade_hit,'hit'),collapse='_')
 
-    if(!(hitvar %in% names(obj$fixations))){
+    if(eyedata=='blinks'){
+      hitvar=NULL
+    }
+
+    if(eyedata=='fixations' && !(hitvar %in% names(obj$fixations))){
       warning('running calcHits first...')
       obj <- calcHits(obj,rois=roi,append=T)
     }
@@ -250,9 +272,9 @@ epoch_fixations <- function(obj,rois=c(1),start=0,end=700,binwidth=25,event='sta
 
     eventdata <- obj$header[,unique(c('ID','eyetrial','starttime',event))]
 
-    df <- obj$fixations[,c('ID','eyetrial','fixation_key',startvar,endvar,hitvar)]
-    df <- merge(df,eventdata,by=c('ID','eyetrial'),all.x=T)
-    df <- dplyr::arrange(df,fixation_key)
+    df <- obj[[eyedata]][,c('ID','eyetrial',keyvar,startvar,endvar,hitvar)]
+    df <- dplyr::left_join(df,eventdata,by=c('ID','eyetrial'))
+    df <- dplyr::arrange_(df,.dots = keyvar)
 
     #convert to "trial time" if we're not time locking to beginning of trial
     if(event !='starttime')
@@ -301,15 +323,15 @@ epoch_fixations <- function(obj,rois=c(1),start=0,end=700,binwidth=25,event='sta
     if(is.null(obj$epochs$fixations[[event]]))
       obj$epochs$fixations[[event]] <- list()
 
-    obj$fixation_epochs[[event]][[roi]] <- list()
-    obj$fixation_epochs[[event]][[roi]]$data <- df[c('ID','eyetrial','fixation_key','binwidth','bin_start','bin_end','start_adj','end_adj',hitvar)]
-    obj$fixation_epochs[[event]][[roi]]$roi <- roi
-    obj$fixation_epochs[[event]][[roi]]$epoch <- c(start,end)
-    obj$fixation_epochs[[event]][[roi]]$binwidth <- binwidth
-    obj$fixation_epochs[[event]][[roi]]$firstbin <- firstbin
-    obj$fixation_epochs[[event]][[roi]]$lastbin <- lastbin
-    obj$fixation_epochs[[event]][[roi]]$numbins <- numbins
-    obj$fixation_epochs[[event]][[roi]]$varnames <- vars
+    obj[[epochvar]][[event]][[roi]] <- list()
+    obj[[epochvar]][[event]][[roi]]$data <- df[c('ID','eyetrial','key','binwidth','bin_start','bin_end','start_adj','end_adj',hitvar)]
+    obj[[epochvar]][[event]][[roi]]$roi <- roi
+    obj[[epochvar]][[event]][[roi]]$epoch <- c(start,end)
+    obj[[epochvar]][[event]][[roi]]$binwidth <- binwidth
+    obj[[epochvar]][[event]][[roi]]$firstbin <- firstbin
+    obj[[epochvar]][[event]][[roi]]$lastbin <- lastbin
+    obj[[epochvar]][[event]][[roi]]$numbins <- numbins
+    obj[[epochvar]][[event]][[roi]]$varnames <- vars
 
   }
 
@@ -328,17 +350,17 @@ epoch_fixations <- function(obj,rois=c(1),start=0,end=700,binwidth=25,event='sta
 }
 
 
-intervals2matrix <- function(start,end,val,numbins){
+intervals2matrix <- function(start,end,val,numbins,fillval=NA){
 
 
   #function to create vector timeseries given starting and ending points
-  f <- function(x,y,n){
+  f <- function(x,y,n,fillval){
 
     x <- x[x<=n] #throw out times after our maximum interval
 
     subs <- as.matrix(cbind(rep(1,length(x)),x))
     vals <- rep(y,nrow(subs))
-    return(pracma::accumarray(subs,vals,sz = c(1,n),fillval = NA))
+    return(pracma::accumarray(subs,vals,sz = c(1,n),fillval = fillval))
 
   }
 
@@ -346,7 +368,7 @@ intervals2matrix <- function(start,end,val,numbins){
   intervals <- purrr::map2(start,end,~ seq(.x,.y))
 
   #convert these to vectors of 1's,0's, and NA's
-  res <- purrr::map2(intervals,val,~ f(.x,.y,numbins))
+  res <- purrr::map2(intervals,val,~ f(.x,.y,numbins,fillval))
   #concatenate the result
   vectors <- do.call(rbind,res)
 
@@ -369,10 +391,10 @@ aggregate_fixation_epochs <- function(obj,event='starttime',rois=c(1),groupvars=
 
   for(r in rois){
 
-    df <- eyemerge(obj,'epoched_fixations',event=event,roi=r, behdata = groupvars,condition=condition, condition.str=T)
+    df <- eyemerge(obj,'fixations_epochs',event=event,roi=r, behdata = groupvars,condition=condition, condition.str=T)
 
 
-    timevars <- obj$fixation_epochs[[event]][[r]]$varnames
+    timevars <- obj$fixations_epochs[[event]][[r]]$varnames
 
     if(is.numeric(r))
       hitvar <- paste0('roi_',r)
@@ -617,7 +639,7 @@ add.subjects <- function(obj,edfs,beh){
   comb$edfs <- c(obj$edfs,newsubs$edfs)
   comb$subs <- c(obj$subs,newsubs$subs)
   comb$fixations <- rbind(obj$fixations,newsubs$fixations)
-  comb$fixations$fixation_key <- 1:nrow(comb$fixations)
+  comb$fixations$key <- 1:nrow(comb$fixations)
 
   comb$saccades <- rbind(obj$saccades,newsubs$saccades)
   comb$saccades$saccade_key <- 1:nrow(comb$saccades)
