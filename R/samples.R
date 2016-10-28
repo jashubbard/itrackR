@@ -413,20 +413,47 @@ interpolate.gaps <- function(y,gaps)
 
 
 
-get_sample_epochs <-function(obj,parallel=T,ncores=2,...){
+get_sample_epochs <-function(obj,IDs=NULL,parallel=T,ncores=2,condition=NULL,condition.str=FALSE,...){
 
 if(length(obj$beh)==0)
   obj <- add_behdata(obj)
 
+#filter out data based on some condition
+if(!condition.str)
+  condition <- deparse(substitute(condition))
+
+behdata <- obj$beh
+
+if(condition!="NULL"){
+  condition_call <- parse(text=condition)
+  r <- eval(condition_call,behdata, parent.frame())
+  behdata <- behdata[r, ]
+}
+
+#for working on subset of our data
+if(!is.null(IDs)){
+  subs = which(obj$subs %in% IDs)
+  behdata <- dplyr::filter(behdata,ID %in% IDs)
+}
+else
+  subs = 1:length(obj$subs)
+
+
 #create a database with behaivoral data
 db2 <- RSQLite::dbConnect(RSQLite::SQLite(),dbname=file.path(path.expand(obj$sample.dir),'beh.sqlite'))
-RSQLite::dbWriteTable(db2,'beh',as.data.frame(obj$beh),row.names=F,overwrite=T)
+RSQLite::dbWriteTable(db2,'beh',as.data.frame(behdata),row.names=F,overwrite=T)
 RSQLite::dbGetQuery(db2,'CREATE INDEX person ON beh (ID,eyetrial)')
 RSQLite::dbDisconnect(db2)
+
+
 
 if(parallel){
 
   print('Getting sample epochs (in parallel)...')
+
+  #clear previous state for foreach
+  env <- foreach:::.foreachGlobals
+  rm(list=ls(name=env), pos=env)
 
 
   #set up cluster with maximum number of cores
@@ -435,10 +462,10 @@ if(parallel){
   doParallel::registerDoParallel(cl)
 
   #run with %dopar%
-  epochs <- foreach::foreach(i=iterators::iter(1:length(obj$edfs)),.packages=c('data.table','itrackR'),.errorhandling = 'remove',.combine=dplyr::bind_rows) %dopar%
+  epochs <- foreach::foreach(i=iterators::iter(subs),.packages=c('data.table','itrackR'),.errorhandling = 'stop',.combine=dplyr::bind_rows) %dopar%
   {
     eps <- get_avg_epochs(obj,i,...)
-    eps
+    return(eps)
   }
 
   parallel::stopCluster(cl)
@@ -446,10 +473,10 @@ if(parallel){
 else{
 
   #serial version - exactly the same, but with %do%
-  epochs <- foreach::foreach(i=iterators::iter(1:length(obj$edfs)),.packages=c('data.table','itrackR'),.errorhandling = 'remove',.combine=dplyr::bind_rows) %do%
+  epochs <- foreach::foreach(i=iterators::iter(subs),.packages=c('data.table','itrackR'),.errorhandling = 'remove',.combine=dplyr::bind_rows) %do%
   {
     eps <- get_avg_epochs(obj,i,...)
-    eps
+    return(eps)
   }
 }
 
@@ -515,13 +542,15 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
     if(RSQLite::dbExistsTable(db,'BASELINE'))
       dbGetQuery(db,'DROP TABLE BASELINE')
 
-    RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE BASELINE AS SELECT *, (pa-baseline)/baseline as pupil_baseline FROM EPOCHS LEFT JOIN (SELECT ID,eyetrial,AVG(pa) as baseline FROM EPOCHS WHERE timepoint BETWEEN %d and %d GROUP BY epochnum) base ON base.ID=EPOCHS.ID AND base.eyetrial=EPOCHS.eyetrial',bl[1],bl[2]))
+    RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE BASELINE AS SELECT *, (pa-baseline)/baseline as pupil_baseline FROM EPOCHS LEFT JOIN (SELECT ID,eyetrial,AVG(pa) as baseline, epochnum FROM EPOCHS WHERE timepoint BETWEEN %d and %d GROUP BY epochnum) base ON base.ID=EPOCHS.ID AND base.eyetrial=EPOCHS.eyetrial',bl[1],bl[2]))
   }
+
+
+  #this holds everyone's behavioral data
+  RSQLite::dbGetQuery(db,sprintf('ATTACH "%s" as beh', file.path(path.expand(obj$sample.dir),'beh.sqlite')))
 
   #for aggregating
   if(aggregate){
-    #this holds everyone's behavioral data
-    RSQLite::dbGetQuery(db,sprintf('ATTACH "%s" as beh', file.path(path.expand(obj$sample.dir),'beh.sqlite')))
 
     if(!is.null(baseline)){
       #if baselined, merge BASELINE with the behavioral data and compute the average by factors and timepoint
@@ -533,16 +562,23 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
       res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,timepoint, AVG(pa) as pupil FROM (SELECT EPOCHS.ID,EPOCHS.timepoint, EPOCHS.eyetrial,EPOCHS.pa,%s FROM EPOCHS INNER JOIN beh ON beh.ID=EPOCHS.ID AND beh.eyetrial=EPOCHS.eyetrial) GROUP BY %s,timepoint ORDER BY %s',facnames,facnames_beh,facnames,facnames))
     }
 
-    #don't need this anymore
-    RSQLite::dbGetQuery(db,'DETACH beh')
+
   }
   else{
     #if not aggregating, give me all the data
-    if(!is.null(baseline))
-      res <- RSQLite::dbGetQuery(db,'SELECT * FROM BASELINE')
-    else
-      res <- RSQLite::dbGetQuery(db,'SELECT * FROM EPOCHS')
+    if(!is.null(baseline)){
+      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,eyetrial, epochnum,timepoint, pupil, pupil_raw FROM (SELECT BASELINE.ID,BASELINE.timepoint, BASELINE.eyetrial,BASELINE.pupil_baseline as pupil ,BASELINE.pa as pupil_raw, BASELINE.epochnum,%s FROM BASELINE INNER JOIN beh ON beh.ID=BASELINE.ID AND beh.eyetrial=BASELINE.eyetrial) ORDER BY ID,eyetrial,timepoint',facnames,facnames_beh))
+      # res <- RSQLite::dbGetQuery(db,'SELECT * FROM BASELINE')
+    }
+    else{
+      # print(sprintf('SELECT ID,%s,eyetrial, epochnum, timepoint, pa as pupil FROM (SELECT EPOCHS.ID,EPOCHS.timepoint, EPOCHS.eyetrial,EPOCHS.pa, EPOCHS.epochnum, %s FROM EPOCHS INNER JOIN beh ON beh.ID=EPOCHS.ID AND beh.eyetrial=EPOCHS.eyetrial) ORDER BY ID,eyetrial,timepoint',facnames,facnames_beh))
+      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,eyetrial, epochnum, timepoint, pa as pupil FROM (SELECT EPOCHS.ID,EPOCHS.timepoint, EPOCHS.eyetrial,EPOCHS.pa, EPOCHS.epochnum, %s FROM EPOCHS INNER JOIN beh ON beh.ID=EPOCHS.ID AND beh.eyetrial=EPOCHS.eyetrial) ORDER BY ID,eyetrial,timepoint',facnames,facnames_beh))
+      # res <- RSQLite::dbGetQuery(db,'SELECT * FROM EPOCHS')
+    }
   }
+
+  #don't need this anymore
+  RSQLite::dbGetQuery(db,'DETACH beh')
 
   #remove the EPOCHS table
   if(cleanup){
@@ -556,15 +592,14 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
   ep <- epoch[1]:epoch[2]
   res$epoch_time <- as.numeric(ep[res$timepoint])
 
-  res$pupil <- as.numeric(res$pupil)
+  if('pupil' %in% names(res))
+    res$pupil <- as.numeric(res$pupil)
 
-  if(!is.null(baseline)){
+  if('pupil_raw' %in% names(res))
     res$pupil_raw <- as.numeric(res$pupil_raw)
 
-    if(!aggregate)
-      res$baseline <- as.numeric(res$baseline)
 
-  }
+  # res <- as.data.frame(sapply(res, as.numeric))
 
   return(res)
 
