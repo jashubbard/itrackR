@@ -82,13 +82,16 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
 
     print('Loading samples (in parallel)...')
 
+    #clear previous state for foreach
+    env <- foreach:::.foreachGlobals
+    rm(list=ls(name=env), pos=env)
 
     #set up cluster with maximum number of cores
     cl <- parallel::makeCluster(ncores)
     doParallel::registerDoParallel(cl)
 
     #run with dopar
-    allsamps <- foreach::foreach(edf=iterators::iter(1:length(obj$edfs)),.packages=c('data.table')) %dopar%
+    allsamps <- foreach::foreach(edf=iterators::iter(1:length(obj$edfs)),.packages=c('data.table','itrackR')) %dopar%
     {
       fname <- load_sample_file(obj,edf,force=force)
       fname
@@ -487,7 +490,7 @@ return(epochs)
 
 }
 
-get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=c('ID'), aggregate=T, baseline=NULL,cleanup=F){
+get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=c('ID'), aggregate=T, baseline=NULL,...){
 
   #get the subject ID
   subID <- obj$subs[s]
@@ -515,18 +518,23 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
 
     if(i==1){
       #first row, create a temporary table called EPOCHS
-      if(RSQLite::dbExistsTable(db,'EPOCHS'))
-        RSQLite::dbGetQuery(db,'DROP TABLE EPOCHS')
+      if(RSQLite::dbExistsTable(db,'EPOCHS_TMP'))
+        RSQLite::dbGetQuery(db,'DROP TABLE EPOCHS_TMP')
 
-      RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE EPOCHS AS SELECT ID,time,eyetrial,pa, time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i,tmp$tstart[i],tmp$tend[i],subID))
+      RSQLite::dbGetQuery(db,sprintf('CREATE TEMPORARY TABLE EPOCHS_TMP AS SELECT ID,time,eyetrial,pa, time - %d+1 AS timepoint, rowid as time_idx, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i,tmp$tstart[i],tmp$tend[i],subID))
       RSQLite::dbBegin(db) #faster INSERT if we use BEGIN...COMMIT statement
 
     }else #otherwise, append to the already made EPOCHS table
-      RSQLite::dbGetQuery(db,sprintf('INSERT INTO EPOCHS (ID,time,eyetrial,pa,timepoint,epochnum) SELECT ID,time,eyetrial,pa,time - %d+1 AS timepoint, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i, tmp$tstart[i],tmp$tend[i],subID))
+      RSQLite::dbGetQuery(db,sprintf('INSERT INTO EPOCHS_TMP (ID,time,eyetrial,pa,timepoint,time_idx,epochnum) SELECT ID,time,eyetrial,pa,time - %d+1 AS timepoint, rowid as time_idx, %d as epochnum FROM samples WHERE time BETWEEN %d AND %d AND ID=%d',tmp$tstart[i],i, tmp$tstart[i],tmp$tend[i],subID))
   }
 
   #COMMIT when done inserting
   RSQLite::dbCommit(db)
+
+
+  #create a time_idx variable in EPOCHS
+  RSQLite::dbGetQuery(db,'CREATE TEMPORARY TABLE EPOCHS AS SELECT EPOCHS_TMP.ID,EPOCHS_TMP.time,EPOCHS_TMP.eyetrial,EPOCHS_TMP.pa,EPOCHS_TMP.timepoint,EPOCHS_TMP.epochnum, time_idx - mintime+1 as time_idx FROM EPOCHS_TMP LEFT JOIN (SELECT ID, epochnum, MIN(time_idx) as mintime FROM EPOCHS_TMP GROUP BY ID,epochnum) epochtime ON epochtime.ID=EPOCHS_TMP.ID AND epochtime.epochnum=EPOCHS_TMP.epochnum')
+
 
   #if we want our data baselined
   if(!is.null(baseline)){
@@ -554,12 +562,12 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
 
     if(!is.null(baseline)){
       #if baselined, merge BASELINE with the behavioral data and compute the average by factors and timepoint
-      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,timepoint, AVG(pupil_baseline) as pupil, AVG(pa) as pupil_raw FROM (SELECT BASELINE.ID,BASELINE.timepoint, BASELINE.eyetrial,BASELINE.pupil_baseline,BASELINE.pa,%s FROM BASELINE INNER JOIN beh ON beh.ID=BASELINE.ID AND beh.eyetrial=BASELINE.eyetrial) GROUP BY %s,timepoint ORDER BY %s',facnames,facnames_beh,facnames,facnames))
-
+      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,timepoint,time_idx, AVG(pupil_baseline) as pupil, AVG(pa) as pupil_raw FROM (SELECT BASELINE.ID,BASELINE.timepoint, BASELINE.time_idx, BASELINE.eyetrial,BASELINE.pupil_baseline,BASELINE.pa,%s FROM BASELINE INNER JOIN beh ON beh.ID=BASELINE.ID AND beh.eyetrial=BASELINE.eyetrial) GROUP BY %s,time_idx ORDER BY %s',facnames,facnames_beh,facnames,facnames))
     }
     else{
       #otherwise, merge EPOCHS with the behavioral data and compute the average by factors and timepoint
-      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,timepoint, AVG(pa) as pupil FROM (SELECT EPOCHS.ID,EPOCHS.timepoint, EPOCHS.eyetrial,EPOCHS.pa,%s FROM EPOCHS INNER JOIN beh ON beh.ID=EPOCHS.ID AND beh.eyetrial=EPOCHS.eyetrial) GROUP BY %s,timepoint ORDER BY %s',facnames,facnames_beh,facnames,facnames))
+      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,timepoint,time_idx, AVG(pa) as pupil FROM (SELECT EPOCHS.ID,EPOCHS.timepoint, EPOCHS.time_idx, EPOCHS.eyetrial,EPOCHS.pa,%s FROM EPOCHS INNER JOIN beh ON beh.ID=EPOCHS.ID AND beh.eyetrial=EPOCHS.eyetrial) GROUP BY %s,time_idx ORDER BY %s',facnames,facnames_beh,facnames,facnames))
+
     }
 
 
@@ -567,12 +575,12 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
   else{
     #if not aggregating, give me all the data
     if(!is.null(baseline)){
-      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,eyetrial, epochnum,timepoint, pupil, pupil_raw FROM (SELECT BASELINE.ID,BASELINE.timepoint, BASELINE.eyetrial,BASELINE.pupil_baseline as pupil ,BASELINE.pa as pupil_raw, BASELINE.epochnum,%s FROM BASELINE INNER JOIN beh ON beh.ID=BASELINE.ID AND beh.eyetrial=BASELINE.eyetrial) ORDER BY ID,eyetrial,timepoint',facnames,facnames_beh))
+      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,eyetrial, epochnum,timepoint,time_idx, pupil, pupil_raw FROM (SELECT BASELINE.ID,BASELINE.timepoint, BASELINE.time_idx, BASELINE.eyetrial,BASELINE.pupil_baseline as pupil ,BASELINE.pa as pupil_raw, BASELINE.epochnum,%s FROM BASELINE INNER JOIN beh ON beh.ID=BASELINE.ID AND beh.eyetrial=BASELINE.eyetrial) ORDER BY ID,eyetrial,timepoint',facnames,facnames_beh))
       # res <- RSQLite::dbGetQuery(db,'SELECT * FROM BASELINE')
     }
     else{
       # print(sprintf('SELECT ID,%s,eyetrial, epochnum, timepoint, pa as pupil FROM (SELECT EPOCHS.ID,EPOCHS.timepoint, EPOCHS.eyetrial,EPOCHS.pa, EPOCHS.epochnum, %s FROM EPOCHS INNER JOIN beh ON beh.ID=EPOCHS.ID AND beh.eyetrial=EPOCHS.eyetrial) ORDER BY ID,eyetrial,timepoint',facnames,facnames_beh))
-      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,eyetrial, epochnum, timepoint, pa as pupil FROM (SELECT EPOCHS.ID,EPOCHS.timepoint, EPOCHS.eyetrial,EPOCHS.pa, EPOCHS.epochnum, %s FROM EPOCHS INNER JOIN beh ON beh.ID=EPOCHS.ID AND beh.eyetrial=EPOCHS.eyetrial) ORDER BY ID,eyetrial,timepoint',facnames,facnames_beh))
+      res <- RSQLite::dbGetQuery(db,sprintf('SELECT ID,%s,eyetrial, epochnum, timepoint, time_idx, pa as pupil FROM (SELECT EPOCHS.ID,EPOCHS.timepoint, EPOCHS.time_idx,EPOCHS.eyetrial,EPOCHS.pa, EPOCHS.epochnum, %s FROM EPOCHS INNER JOIN beh ON beh.ID=EPOCHS.ID AND beh.eyetrial=EPOCHS.eyetrial) ORDER BY ID,eyetrial,timepoint',facnames,facnames_beh))
       # res <- RSQLite::dbGetQuery(db,'SELECT * FROM EPOCHS')
     }
   }
@@ -580,13 +588,9 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
   #don't need this anymore
   RSQLite::dbGetQuery(db,'DETACH beh')
 
-  #remove the EPOCHS table
-  if(cleanup){
-    RSQLite::dbGetQuery(db,'DROP TABLE EPOCHS')
-  }
-
   #disconnect from database
   RSQLite::dbDisconnect(db)
+
 
   #add the actuall time
   ep <- epoch[1]:epoch[2]

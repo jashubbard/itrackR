@@ -257,7 +257,7 @@ plot_sample_epochs <- function(epochs,groups=NULL,colors=NULL,rows=NULL,cols=NUL
 
   if(aggregate){
 
-    epochs <- dplyr::group_by_(epochs, .dots = unique(c(groups,colors,rows,cols,'epoch_time'))) %>%
+    epochs <- dplyr::group_by_(epochs, .dots = unique(c(groups,colors,rows,cols,'time_idx','epoch_time'))) %>%
       dplyr::summarise(pupil = mean(pupil,na.rm=T))
 
     if(is.null(groups)){
