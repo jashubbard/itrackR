@@ -80,7 +80,7 @@ calcHits_saccades <- function(obj,rois='all',append=FALSE){
 
   allnames <- c(paste0('roi_start_',allnames), paste0('roi_end_',allnames))
 
-  hits <- data.frame(saccade_key = obj$saccades$saccade_key)
+  hits <- data.frame(key = obj$saccades$key)
   names(hits)[-1] <- allnames
 
   for(i in 1:length(allrois)){
@@ -91,14 +91,14 @@ calcHits_saccades <- function(obj,rois='all',append=FALSE){
     hits[allnames[[i]]] <- as.numeric(spatstat::inside.owin(obj$saccades$genx,obj$saccades$geny,allrois[[i-length(allrois)]]))
   }
 
-  hits <- hits[,c('saccade_key',allnames)]
+  hits <- hits[,c('key',allnames)]
 
   if(!append)
-    tmp <- obj$saccades[c('saccade_key','ID','eyetrial','sttime','entime','gstx','gsty','genx','geny')]
+    tmp <- obj$saccades[c('key','ID','eyetrial','sttime','entime','gstx','gsty','genx','geny')]
   else
     tmp <- obj$saccades
 
-  obj$saccades <- cbind(tmp,dplyr::select(hits,-saccade_key))
+  obj$saccades <- cbind(tmp,dplyr::select(hits,-key))
 
   return(obj)
 }
@@ -642,13 +642,13 @@ add.subjects <- function(obj,edfs,beh){
   comb$fixations$key <- 1:nrow(comb$fixations)
 
   comb$saccades <- rbind(obj$saccades,newsubs$saccades)
-  comb$saccades$saccade_key <- 1:nrow(comb$saccades)
+  comb$saccades$key <- 1:nrow(comb$saccades)
 
   comb$messages <- rbind(obj$messages,newsubs$messages)
-  comb$messages$message_key <- 1:nrow(comb$messages)
+  comb$messages$key <- 1:nrow(comb$messages)
 
   comb$blinks <- rbind(obj$blinks,newsubs$blinks)
-  comb$blinks$blink_key <- 1:nrow(comb$blink)
+  comb$blinks$key <- 1:nrow(comb$blink)
 
   comb$beh <- rbind(obj$beh,newsubs$beh)
 
