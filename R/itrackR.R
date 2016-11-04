@@ -624,8 +624,9 @@ eyemerge <- function(obj,eyedata='fixations',behdata='all',all.rois=F,event='sta
     # eyevars <- c('ID','eyetrial',obj$indexvars,'roi','epoch_start','epoch_end','binwidth','sttime','entime',hitvar,timevars)
     # eyes <- eyes[eyevars]
 
-    output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
-    output <- dplyr::arrange(output,ID,eyetrial)
+    # output <- dplyr::right_join(beh,eyes,by=c('ID','eyetrial'))
+    output <- dplyr::inner_join(beh,eyes,by=c('ID','eyetrial'))
+    output <- dplyr::arrange(output,ID,eyetrial,key)
   }
   else{
 

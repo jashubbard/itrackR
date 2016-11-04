@@ -353,26 +353,64 @@ epoch_events <- function(obj,eyedata='fixations',epoch = c(0,700), event='startt
 intervals2matrix <- function(start,end,val,numbins,fillval=NA){
 
 
-  #function to create vector timeseries given starting and ending points
-  f <- function(x,y,n,fillval){
+  #new intervals2matrix
+  #ge the intervals of start:end bin (1 list per fixation/saccade/whatever)
+  intervals <- map2(start,end,~ seq(.x,.y))
+  #figure out the length of each of those intervals
+  lengths <- unlist(lapply(intervals,length))
+  #we will create a matrix of indices for our big matrix. We need a row num, and for each row, the bin will be the column
+  rownums <- unlist(map2(1:length(lengths),lengths,~ rep(.x,.y)))
 
-    x <- x[x<=n] #throw out times after our maximum interval
+  #this creates that matrix. Column 1 is row index, column 2 is column index
+  subs <- as.matrix(cbind(rownums,unlist(intervals)))
 
-    subs <- as.matrix(cbind(rep(1,length(x)),x))
-    vals <- rep(y,nrow(subs))
-    return(pracma::accumarray(subs,vals,sz = c(1,n),fillval = fillval))
+  #whatever hit variable we want to fill in, get the actual values and replicate them for the full interval
+  vals <- unlist(map2(val, lengths, ~ rep(.x,.y) ))
+
+  #create our sparse matrix, with row and column indices, fill with the values from the hit variable
+  sp <- Matrix::sparseMatrix(i=subs[,1],j=subs[,2],x=vals)
+
+  #sparse matrix will have zeros where we didn't specify values
+  #for fixations/saccades we want it to be missing data.
+  #this creates a "mask" for making those missing values
+  if(is.na(fillval)){
+    mask <- Matrix::sparseMatrix(i=subs[,1],j=subs[,2],x=rep(999,nrow(subs)))
+    nempty <- mask==0
+    #cases where fixations/saccades/whatever didn't occur, we make NA
+    sp[nempty] <- rep(NA,sum(nempty))
+  }else{
+
+    #if it's 0, we don't need this step. Skip to save time
+    if(fillval !=0){
+      mask <- Matrix::sparseMatrix(i=subs[,1],j=subs[,2],x=rep(999,nrow(subs)))
+      nempty <- mask==0
+      #cases where fixations/saccades/whatever didn't occur, we make NA
+      sp[nempty] <- rep(fillval,sum(nempty))
+    }
 
   }
 
-  # intervals <- map2(test$sttime,test$entime,~ ((seq(.x,.y,binwidth)-.x)/binwidth)+1)
-  intervals <- purrr::map2(start,end,~ seq(.x,.y))
 
-  #convert these to vectors of 1's,0's, and NA's
-  res <- purrr::map2(intervals,val,~ f(.x,.y,numbins,fillval))
-  #concatenate the result
-  vectors <- do.call(rbind,res)
+  # #function to create vector timeseries given starting and ending points
+  # f <- function(x,y,n,fillval){
+  #
+  #   x <- x[x<=n] #throw out times after our maximum interval
+  #
+  #   subs <- as.matrix(cbind(rep(1,length(x)),x))
+  #   vals <- rep(y,nrow(subs))
+  #   return(pracma::accumarray(subs,vals,sz = c(1,n),fillval = fillval))
+  #
+  # }
+  #
+  # # intervals <- map2(test$sttime,test$entime,~ ((seq(.x,.y,binwidth)-.x)/binwidth)+1)
+  # intervals <- purrr::map2(start,end,~ seq(.x,.y))
+  #
+  # #convert these to vectors of 1's,0's, and NA's
+  # res <- purrr::map2(intervals,val,~ f(.x,.y,numbins,fillval))
+  # #concatenate the result
+  # vectors <- do.call(rbind,res)
 
-  return(vectors)
+  return(as.matrix(sp))
 
 }
 
@@ -401,9 +439,9 @@ aggregate_fixation_epochs <- function(obj,event='starttime',rois=c(1),groupvars=
     else
       hitvar <- paste0(r,'_hit')
 
-    test <- dplyr::select_(df,.dots=paste0('-',hitvar)) %>%
-      tidyr::gather_('timepoint','val',timevars) %>%
-      dplyr::mutate(timepoint = gsub('t','',timepoint),
+    test <- dplyr::select_(df,.dots=paste0('-',hitvar))
+    test <- tidyr::gather_(test,'timepoint','val',timevars)
+    test <- dplyr::mutate(test,timepoint = gsub('t','',timepoint),
                     timepoint = as.numeric(gsub('_','-',timepoint)))
 
     if(is.numeric(r)){
@@ -420,14 +458,14 @@ aggregate_fixation_epochs <- function(obj,event='starttime',rois=c(1),groupvars=
 
 
   #aggregate on the trial level
-  allres <- dplyr::bind_rows(allres)%>%
-    dplyr::group_by_(.dots=unique(c('ID','eyetrial',groupvars,'timepoint','roi')))%>%
-    dplyr::summarise(val = max(val,na.rm=T))
+  allres <- dplyr::bind_rows(allres)
+  allres <- dplyr::group_by_(allres,.dots=unique(c('ID','eyetrial',groupvars,'timepoint','roi')))
+  allres <- dplyr::summarise(allres,val = max(val,na.rm=T))
 
   if(level %in% c('subject','ID','group')){
 
-    allres <- dplyr::group_by_(allres,.dots=unique(c('ID',groupvars,'timepoint','roi'))) %>%
-      dplyr::summarise(val = mean(val,na.rm=T))
+    allres <- dplyr::group_by_(allres,.dots=unique(c('ID',groupvars,'timepoint','roi')))
+    allres <- dplyr::summarise(allres,val = mean(val,na.rm=T))
 
     if(tolower(type) %in% c('difference','logratio','proportion')){
 
@@ -460,9 +498,9 @@ aggregate_fixation_epochs <- function(obj,event='starttime',rois=c(1),groupvars=
 
 
   if(level=='group'){
-    allres <-  dplyr::group_by_(allres,.dots=unique(c(groupvars,'timepoint','roi'))) %>%
-      dplyr::summarise(val = mean(val,na.rm=T)) %>%
-      dplyr::arrange_(.dots=unique(c(groupvars,'roi','timepoint')))
+    allres <-  dplyr::group_by_(allres,.dots=unique(c(groupvars,'timepoint','roi')))
+    allres <- dplyr::summarise(allres, val = mean(val,na.rm=T))
+    allres <- dplyr::arrange_(allres,.dots=unique(c(groupvars,'roi','timepoint')))
   }
 
 
