@@ -26,7 +26,8 @@ Imports:
     magrittr,
     data.table,
     edfR,
-    RSQLite (>= 1.0.0)
+    RSQLite (>= 1.0.0),
+    purrr
 Suggests:
     rmarkdown,
     testthat

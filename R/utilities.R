@@ -355,17 +355,17 @@ intervals2matrix <- function(start,end,val,numbins,fillval=NA){
 
   #new intervals2matrix
   #ge the intervals of start:end bin (1 list per fixation/saccade/whatever)
-  intervals <- map2(start,end,~ seq(.x,.y))
+  intervals <- purrr::map2(start,end,~ seq(.x,.y))
   #figure out the length of each of those intervals
   lengths <- unlist(lapply(intervals,length))
   #we will create a matrix of indices for our big matrix. We need a row num, and for each row, the bin will be the column
-  rownums <- unlist(map2(1:length(lengths),lengths,~ rep(.x,.y)))
+  rownums <- unlist(purrr::map2(1:length(lengths),lengths,~ rep(.x,.y)))
 
   #this creates that matrix. Column 1 is row index, column 2 is column index
   subs <- as.matrix(cbind(rownums,unlist(intervals)))
 
   #whatever hit variable we want to fill in, get the actual values and replicate them for the full interval
-  vals <- unlist(map2(val, lengths, ~ rep(.x,.y) ))
+  vals <- unlist(purrr::map2(val, lengths, ~ rep(.x,.y) ))
 
   #create our sparse matrix, with row and column indices, fill with the values from the hit variable
   sp <- Matrix::sparseMatrix(i=subs[,1],j=subs[,2],x=vals)
@@ -389,26 +389,6 @@ intervals2matrix <- function(start,end,val,numbins,fillval=NA){
     }
 
   }
-
-
-  # #function to create vector timeseries given starting and ending points
-  # f <- function(x,y,n,fillval){
-  #
-  #   x <- x[x<=n] #throw out times after our maximum interval
-  #
-  #   subs <- as.matrix(cbind(rep(1,length(x)),x))
-  #   vals <- rep(y,nrow(subs))
-  #   return(pracma::accumarray(subs,vals,sz = c(1,n),fillval = fillval))
-  #
-  # }
-  #
-  # # intervals <- map2(test$sttime,test$entime,~ ((seq(.x,.y,binwidth)-.x)/binwidth)+1)
-  # intervals <- purrr::map2(start,end,~ seq(.x,.y))
-  #
-  # #convert these to vectors of 1's,0's, and NA's
-  # res <- purrr::map2(intervals,val,~ f(.x,.y,numbins,fillval))
-  # #concatenate the result
-  # vectors <- do.call(rbind,res)
 
   return(as.matrix(sp))
 
