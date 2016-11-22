@@ -55,12 +55,17 @@
 #
 # }
 
-load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
+load_samples <- function(obj,IDs=NULL,outdir=NULL, force=F,parallel=TRUE, ncores = 2, samprate = NULL){
 
   allsamps <- list()
 
+  if(!is.null(IDs)){
+    subs <- which(obj$subs %in% IDs)
+  }else
+    subs <- seq_along(z$subs)
+
   #if we're not forcing and all the files are there, then just go back
-  if(!force && all(unlist(lapply(obj$samples,file.exists))))
+  if(!force && length(obj$samples)>0 && all(unlist(lapply(obj$samples[subs],file.exists))))
     return(obj)
 
   #check for directory to save .rds files into
@@ -91,9 +96,9 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
     doParallel::registerDoParallel(cl)
 
     #run with dopar
-    allsamps <- foreach::foreach(edf=iterators::iter(1:length(obj$edfs)),.packages=c('data.table','itrackR')) %dopar%
+    allsamps <- foreach::foreach(edf=iterators::iter(subs),.packages=c('data.table','itrackR')) %dopar%
     {
-      fname <- load_sample_file(obj,edf,force=force)
+      fname <- load_sample_file(obj,edf,force=force,samprate = samprate)
       fname
     }
     #stop cluster when done
@@ -102,12 +107,14 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
   else{
 
     #serial method - use lapply
-    allsamps <- lapply(1:length(obj$edfs), function(x) load_sample_file(obj,x,force=force))
+    allsamps <- lapply(subs, function(x) load_sample_file(obj,x,force=force,samprate=samprate))
 
   }
 
 
-  obj$samples <- allsamps
+
+
+  obj$samples[subs] <- allsamps
   print("complete")
   return(obj)
 
@@ -115,7 +122,7 @@ load_samples <- function(obj,outdir=NULL, force=F,parallel=TRUE, ncores = 2){
 
 
 #write each sample file as a separate database
-load_sample_file <- function(obj,i,force=F){
+load_sample_file <- function(obj,i,force=F,samprate=NULL){
 
   #create the directory if it doesn't exist
   dir.create(path.expand(obj$sample.dir), showWarnings = FALSE)
@@ -150,6 +157,58 @@ load_sample_file <- function(obj,i,force=F){
   samps[,time := time-baseline]
 
   samps$ID <- obj$subs[i]
+
+  if(!is.null(samprate)){
+
+    rec <- edfR::edf.recordings(obj$edfs[i])
+    sr <- rec$sample_rate
+
+    if(length(unique(sr))>1){
+      msg <- sprintf('Sample rate was changed during experiment for subject, %s',obj$subs[i])
+      warning(msg)
+    }
+
+    if(any(sr>samprate)){
+      msg <- sprintf('Sample rate is higher than desired on at least some trials for subject %s. Downsampling...',obj$subs[i])
+      warning(msg)
+
+      if(length(unique(sr))>1){
+        rec <- subset(rec,state==1)
+        rec$time <- rec$time - baseline
+        rec <- dplyr::select(rec,time,sample_rate)
+        rec <- dplyr::inner_join(dplyr::select(samps,time,eyetrial),rec,by='time') #adding "eyetrial" to rec
+
+        #adding sample_rate to samples
+        samps <- dplyr::left_join(as.data.frame(samps),dplyr::select(rec,time,eyetrial,sample_rate), by='time')
+
+
+        #split our data by the trials with too high of a sample rate
+        #and the standard ones
+        #note: only handles the case where there are 2 different sample rates
+        samps_high <- dplyr::filter(samps,sample_rate>samprate)
+        samps_good <- dplyr::filter(samps,sample_rate==samprate)
+
+        #downsample the high ones, starting with row 1
+        downsamp_rate = max(sr,na.rm=T)/samprate
+        samps_high <- dplyr::group_by(samps_high,eyetrial) %>%
+          dplyr::filter((dplyr::row_number(time) %% downsamp_rate) == 1)
+
+        samps <- rbind(samps_high,samps_good) %>%
+          dplyr::arrange(time)
+      }
+      else{
+        downsamp_rate = max(sr,na.rm=T)/samprate
+        #if all trials are at the incorrect sample rate
+        samps <- dplyr::filter(as.data.frame(samps),(dplyr::row_number(time) %% downsamp_rate )==1)
+
+      }
+    }
+
+
+
+
+  }
+
 
   #create a separate database file for each subject in sample.dir
   #one big db would be nice, but can't do in parallel
