@@ -62,7 +62,7 @@ load_samples <- function(obj,IDs=NULL,outdir=NULL, force=F,parallel=TRUE, ncores
   if(!is.null(IDs)){
     subs <- which(obj$subs %in% IDs)
   }else
-    subs <- seq_along(z$subs)
+    subs <- seq_along(obj$subs)
 
   #if we're not forcing and all the files are there, then just go back
   if(!force && length(obj$samples)>0 && all(unlist(lapply(obj$samples[subs],file.exists))))
@@ -564,8 +564,10 @@ get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=
                         'tend' = paste0(event,'+',epoch[2]))
 
   #for our queries, we need our factors as "Task, Conflict", not c("Task", "Conflict")
-  facnames <- paste(factors,collapse = ', ')
-  facnames_beh <- paste('beh.',factors,sep='',collapse=', ')  #to make "beh.Task, beh.Conflict"
+  facnames <- sapply(factors, function(x) paste0('`',x,'`')) #add brackets around each one, to handle vars that match sql commands
+  facnames_beh <- paste('beh.',facnames,sep='',collapse=', ')  #to make "beh.Task, beh.Conflict"
+  facnames <- paste(facnames,collapse = ', ')
+
 
   #connect to this subject's database
   dbname <- obj$samples[[s]]

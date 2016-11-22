@@ -20,3 +20,5 @@ before_install:
  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then unzip eyelink.mpkg.zip; fi
  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then sudo installer -pkg "EyelinkDisplayAPI_1.11.1.mpkg" -target / ; fi
 
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

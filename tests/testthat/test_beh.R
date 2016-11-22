@@ -3,7 +3,6 @@ context('events, behavioral, drift correction')
 z <- itrackr(path=itrackR.data('path'))
 
 
-
 test_that("extracting events and merging", {
 
   z <- set_index(z,varnames=c('Block','Trial'), patterns=c('^BLOCK [0-9]*','^TRIAL [0-9]*'), numeric.only=T)
