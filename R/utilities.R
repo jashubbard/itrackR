@@ -589,16 +589,16 @@ remove.subjects <- function(obj,ID){
   if(length(ID)==1)
     ID <- list(ID)
 
-  ID <- ID[ID %in% obj$subs]
+  ID <- ID[ID %in% obj$ids]
 
   if(length(ID)==0)
     stop("ID(s) not found")
 
-  subs_to_keep <- !(obj$subs %in% ID)
+  subs_to_keep <- !(obj$ids %in% ID)
 
   #remove from our list of edfs and subject ids
   obj$edfs <- obj$edfs[subs_to_keep]
-  obj$subs <- obj$subs[subs_to_keep]
+  obj$ids <- obj$ids[subs_to_keep]
 
   #remove actual data
   obj$header <- obj$header[!(obj$header[[obj$idvar]] %in% ID),]
@@ -611,7 +611,7 @@ remove.subjects <- function(obj,ID){
   if(length(z$samples)>0){
 
     #find the .rds files
-    sampfiles <- obj$samples[obj$subs %in% ID]
+    sampfiles <- obj$samples[obj$ids %in% ID]
     obj$samples <- obj$samples[subs_to_keep] #remove from our list
 
     #delete the actual files
@@ -655,7 +655,7 @@ add.subjects <- function(obj,edfs,beh){
   newsubs <- replay_analysis(newsubs,beh=beh)
 
   comb$edfs <- c(obj$edfs,newsubs$edfs)
-  comb$subs <- c(obj$subs,newsubs$subs)
+  comb$subs <- c(obj$ids,newsubs$subs)
   comb$fixations <- rbind(obj$fixations,newsubs$fixations)
   comb$fixations$key <- 1:nrow(comb$fixations)
 

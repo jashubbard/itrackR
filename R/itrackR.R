@@ -120,7 +120,7 @@ load_edfs <- function(obj,path='.',pattern='*.edf',recursive = FALSE){
     obj$edfs <- unlist(lapply(obj$edfs,make_fullpath))
 
 
-  obj$subs <- edf2id(obj$edfs)
+  obj$ids <- edf2id(obj$ids)
   return(obj)
 
 }
@@ -312,7 +312,7 @@ find_messages <- function(obj,varnames,patterns,numeric.only = FALSE,timestamp=F
 #'
 #'
 #' @param obj an itrackR object
-#' @param beh a data frame containing behavioral data. Should at least have the column \code{ID} which matches ID names/numbers in \code{obj$subs}.
+#' @param beh a data frame containing behavioral data. Should at least have the column \code{ID} which matches ID names/numbers in \code{obj$ids}.
 #' @param append set to TRUE if you've already added behavioral data and you're adding more columns (default = FALSE, overwrite existing data).
 
 #'
