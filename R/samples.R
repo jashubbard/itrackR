@@ -14,12 +14,12 @@
 #     #     justfile <- sub("^([^.]*).*", "\\1", basename(obj$edfs[[i]]))
 #     #     id <- as.numeric(gsub("([0-9]*).*","\\1",justfile))
 #
-#     id <- obj$subs[[i]]
+#     id <- obj$ids[[i]]
 #
 #     header <- subset(obj$header,ID==id)
 #     events <- header[[event]][!is.na(header[[event]])]
 #     trials <- header$eyetrial[!is.na(header[[event]])]
-#     samples <- read_saved_samples(obj$samples[[i]],ID=obj$subs[i],cols=c('ID','time','eyetrial',field))
+#     samples <- read_saved_samples(obj$samples[[i]],ID=obj$ids[i],cols=c('ID','time','eyetrial',field))
 #     # samples <- readRDS(obj$samples[[i]])
 #
 #     thisepoch <- edfR::epoch.samples(events,as.data.frame(samples),sample.field=field,epoch=epoch,eyetrial=T)
@@ -60,9 +60,9 @@ load_samples <- function(obj,IDs=NULL,outdir=NULL, force=F,parallel=TRUE, ncores
   allsamps <- list()
 
   if(!is.null(IDs)){
-    subs <- which(obj$subs %in% IDs)
+    subs <- which(obj$ids %in% IDs)
   }else
-    subs <- seq_along(obj$subs)
+    subs <- seq_along(obj$ids)
 
   #if we're not forcing and all the files are there, then just go back
   if(!force && length(obj$samples)>0 && all(unlist(lapply(obj$samples[subs],file.exists))))
@@ -127,9 +127,9 @@ load_sample_file <- function(obj,i,force=F,samprate=NULL){
   #create the directory if it doesn't exist
   dir.create(path.expand(obj$sample.dir), showWarnings = FALSE)
   #full path to file (need for loading .edf)
-  dbname <- file.path(path.expand(obj$sample.dir),paste0(obj$subs[i],'_samples.sqlite'))
+  dbname <- file.path(path.expand(obj$sample.dir),paste0(obj$ids[i],'_samples.sqlite'))
   #relative path to file (more convenient)
-  dbname_relative <- file.path(obj$sample.dir,paste0(obj$subs[i],'_samples.sqlite'))
+  dbname_relative <- file.path(obj$sample.dir,paste0(obj$ids[i],'_samples.sqlite'))
 
   #don't reload if it's already done and we don't set force=T
   if(!force && file.exists(dbname))
@@ -156,7 +156,7 @@ load_sample_file <- function(obj,i,force=F,samprate=NULL){
   baseline <- samps[1,time]-1
   samps[,time := time-baseline]
 
-  samps$ID <- obj$subs[i]
+  samps$ID <- obj$ids[i]
 
   if(!is.null(samprate)){
 
@@ -164,12 +164,12 @@ load_sample_file <- function(obj,i,force=F,samprate=NULL){
     sr <- rec$sample_rate
 
     if(length(unique(sr))>1){
-      msg <- sprintf('Sample rate was changed during experiment for subject, %s',obj$subs[i])
+      msg <- sprintf('Sample rate was changed during experiment for subject, %s',obj$ids[i])
       warning(msg)
     }
 
     if(any(sr>samprate)){
-      msg <- sprintf('Sample rate is higher than desired on at least some trials for subject %s. Downsampling...',obj$subs[i])
+      msg <- sprintf('Sample rate is higher than desired on at least some trials for subject %s. Downsampling...',obj$ids[i])
       warning(msg)
 
       if(length(unique(sr))>1){
@@ -340,7 +340,7 @@ interpolate.gaps <- function(y,gaps)
 #   for(i in 1:length(obj$edfs))
 #   {
 #
-#     samps <- read_saved_samples(obj$samples[[i]],ID=obj$subs[i],cols=c('ID','time','gx','gy','pa'))
+#     samps <- read_saved_samples(obj$samples[[i]],ID=obj$ids[i],cols=c('ID','time','gx','gy','pa'))
 #     # samps<- readRDS(obj$samples[[i]])
 #
 #     #code bad samples as "blinks"
@@ -494,11 +494,11 @@ if(condition!="NULL"){
 
 #for working on subset of our data
 if(!is.null(IDs)){
-  subs = which(obj$subs %in% IDs)
+  subs = which(obj$ids %in% IDs)
   behdata <- dplyr::filter(behdata,ID %in% IDs)
 }
 else
-  subs = 1:length(obj$subs)
+  subs = 1:length(obj$ids)
 
 
 #create a database with behaivoral data
@@ -552,7 +552,7 @@ return(epochs)
 get_avg_epochs <- function(obj,s,event='starttime', epoch = c(-100,100),factors=c('ID'), aggregate=T, baseline=NULL,...){
 
   #get the subject ID
-  subID <- obj$subs[s]
+  subID <- obj$ids[s]
 
   #take the header of itrackr object, get only this subject's data
   #compute 2 variables, for the start and end time relative to the time-locking event
@@ -747,7 +747,7 @@ blink_remove <- function(dbname,interpolate=FALSE){
 get_samples <- function(obj,IDs,fields=NULL,condition=NULL,parallel=F,ncores=2){
 
 
-  idx <- which(obj$subs %in% IDs)
+  idx <- which(obj$ids %in% IDs)
 
   if(parallel && length(idx)>1){
 
