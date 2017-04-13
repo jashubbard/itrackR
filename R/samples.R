@@ -144,11 +144,19 @@ load_sample_file <- function(obj,i,force=F,samprate=NULL){
       samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
       data.table::setnames(samps,c("paR","gxR","gyR"),c("pa","gx","gy"))
 
-    } else{
+    } else if(all(is.na(samps$paR))){
 
       samps[,(c("paR","gxR","gyR")) :=NULL]
       data.table::setnames(samps,c("paL","gxL","gyL"),c("pa","gx","gy"))
 
+    }
+    else{
+      #in case it was monocular but the eyes were switched
+      samps[,('pa') := dplyr::coalesce(samps$paL,samps$paR)] #coalesce will grab first non-empty value from each row
+      samps[,('gx') := dplyr::coalesce(samps$gxL,samps$gxR)]
+      samps[,('gy') := dplyr::coalesce(samps$gyL,samps$gyR)]
+      samps[,(c("paL","gxL","gyL")) := NULL] #in-place delete of column
+      samps[,(c("paR","gxR","gyR")) :=NULL]
     }
   }
 
