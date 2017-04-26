@@ -21,7 +21,8 @@
 #' plot(z, zoom = T)
 #' }
 #'
-plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=0,quick=F,condition=NULL,oneplot=F, rows=NULL,cols=NULL){
+plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all',names=FALSE,IDs=c(),summarize=F,quick=F,condition=NULL,oneplot=F, rows=NULL,cols=NULL,
+                         wrap=NULL,nrow=NULL,ncol=NULL){
 
   condition <- deparse(substitute(condition))
 
@@ -97,10 +98,24 @@ plot.itrackR <- function(obj,zoom=TRUE,crosshairs=TRUE,rois=TRUE,whichROIs='all'
     p <- p + ggplot2::facet_grid(facetexp,labeller=ggplot2::label_both)
   }
 
+  if (!summarize && !is.null(wrap)){
 
-  if(!summarize && !oneplot && is.null(rows) && is.null(cols)){
-    p <- p + ggplot2::facet_wrap(~ID)
+    if(!is.null(rows))
+      wrap <- unique(c(wrap,rows))
+    if(!is.null(cols))
+      wrap <- unique(c(wrap,cols))
+
+    # wrapexp <- do.call('paste',c(as.list(wrap),sep=' + '))
+
+    # wrapexp <- paste0('~ ',wrapexp)
+
+    p <- p + ggplot2::facet_wrap(unique(wrap),nrow=nrow , ncol = ncol)
   }
+
+
+  # if(!summarize && !oneplot && is.null(rows) && is.null(cols)){
+  #   p <- p + ggplot2::facet_wrap(~ID)
+  # }
 
   p
   return(p)
